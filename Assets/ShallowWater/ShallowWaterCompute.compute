@@ -1,0 +1,87 @@
+#pragma kernel CSMain
+
+//发生在相机位置移动
+#pragma kernel UpdateBufferCS
+
+RWStructuredBuffer<float> PrevPrevBuffer;
+RWStructuredBuffer<float> PrevBuffer;
+RWStructuredBuffer<float> CurrentBuffer;
+Texture2D _ShallowHeightMap;
+
+float4 _ShallowWaterParams;
+
+int _ShallowWaterSize;
+float TravelSpeed;
+float Damping;
+
+float GetPrevBufferValue(int indexX, int indexY, float current)
+{
+    if(indexX < 0 || indexX > _ShallowWaterSize - 1 || indexY < 0 || indexY > _ShallowWaterSize - 1)
+    {
+        return current;
+    }
+    int index = indexX + indexY * _ShallowWaterSize;
+    return PrevBuffer[index];
+}
+
+inline float DecodeFloatRG( float2 enc )
+{
+    float2 kDecodeDot = float2(1.0, 1/255.0);
+    return dot( enc, kDecodeDot );
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if(id.x >= _ShallowWaterSize || id.y >= _ShallowWaterSize)
+    {
+        return;
+    }
+    int index = id.x + id.y * _ShallowWaterSize;
+
+    float height = DecodeFloatRG(_ShallowHeightMap[id.xy].xy) * -1 * _ShallowWaterParams.z;
+    CurrentBuffer[index] = height;
+    float prevHeight = PrevBuffer[index];
+    float nearHeightTotal = GetPrevBufferValue(id.x, id.y + 1, prevHeight) +
+                            GetPrevBufferValue(id.x, id.y - 1, prevHeight) +
+                            GetPrevBufferValue(id.x + 1, id.y, prevHeight) +
+                            GetPrevBufferValue(id.x - 1, id.y, prevHeight);
+
+    float prevprevHeight = PrevPrevBuffer[index];
+    float newHeight = Damping * (prevHeight + (prevHeight - prevprevHeight)) + TravelSpeed * (nearHeightTotal - prevHeight * 4);
+    CurrentBuffer[index] = max(-1, min(1, min(height, newHeight)));
+}
+
+RWStructuredBuffer<float> NewPrevPrevBuffer;
+RWStructuredBuffer<float> NewPrevBuffer;
+RWStructuredBuffer<float> NewCurrentBuffer;
+
+float4 _ShallowBufferUpdateParams;
+
+[numthreads(8,8,1)]
+void UpdateBufferCS (uint3 id : SV_DispatchThreadID)
+{
+    if(id.x >= _ShallowWaterSize || id.y >= _ShallowWaterSize)
+    {
+        return;
+    }
+    int index = id.x + id.y * _ShallowWaterSize;
+
+    int beforeXIndex = id.x + floor(_ShallowBufferUpdateParams.x * _ShallowWaterSize);
+    int beforeYIndex = id.y - floor(_ShallowBufferUpdateParams.y * _ShallowWaterSize);
+
+    if(beforeXIndex < 0 || beforeXIndex >= _ShallowWaterSize ||
+       beforeYIndex < 0 || beforeYIndex >= _ShallowWaterSize)
+    {
+        NewPrevBuffer[index] = 0;
+        NewPrevPrevBuffer[index] = 0;
+        NewCurrentBuffer[index] = 0;
+        return;
+    }
+
+    int beforeIndex = beforeXIndex + beforeYIndex * _ShallowWaterSize;
+    
+    NewPrevBuffer[index] = PrevBuffer[beforeIndex];
+    NewPrevPrevBuffer[index] = PrevPrevBuffer[beforeIndex];
+    NewCurrentBuffer[index] = CurrentBuffer[beforeIndex];
+}
