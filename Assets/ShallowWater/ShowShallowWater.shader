@@ -2,6 +2,7 @@ Shader "Custom/ShowShallowDepth" {
 
     Properties
     {
+        _MainTex("Texture", 2D) = "white" {}
     }
     
     HLSLINCLUDE
@@ -16,8 +17,8 @@ Shader "Custom/ShowShallowDepth" {
     sampler2D _ShallowHeightMap;
     float4 _ShallowWaterParams;
 
-    uniform StructuredBuffer<float> _ShallowWaterBuffer;
     int _ShallowWaterSize;
+    sampler2D _ShallowWaterHeightRT;
     
     v2f vert(appdata_base v)
     {
@@ -25,63 +26,33 @@ Shader "Custom/ShowShallowDepth" {
         o.posWorld = mul(unity_ObjectToWorld, v.vertex);
 
         //需要注意View空间左右手坐标系的转换
-        // float2 uv = (o.posWorld.xz - _ShallowHeightMapOffset.xy) * _ShallowHeightMapOffset.w * float2(1, -1) + float2(0.5, 0.5);
-        // uv = uv * float2(_ShallowWaterWidth, _ShallowWaterHeight);
-        // float heightValue = _ShallowWaterBuffer[uv.y * _ShallowWaterWidth + uv.x];
-        // o.posWorld.y += heightValue;
+        float2 uv = (o.posWorld.xz - _ShallowWaterParams.xy) * _ShallowWaterParams.w * float2(1, -1) + float2(0.5, 0.5);
+
+        uv = saturate(uv);
+        float inShowBound = uv.x > 0 && uv.y > 0 && uv.x < 1 && uv.y < 1;
+        float inArea = inShowBound ? 1 : 0;
+
+        float heightValue = tex2Dlod(_ShallowWaterHeightRT, float4(uv, 0, 0)).r * inArea;
+        o.posWorld.y += heightValue;
 
         o.vertex = mul(UNITY_MATRIX_VP, o.posWorld);
         return o;
     }
 
-
-    float ValidIndex(int index, int totalIndex)
-    {
-        float valid = 1;
-        if(index < 0 && index >= totalIndex)
-        {
-            valid = 0;
-        }
-        return valid;
-    }
+    sampler2D _MainTex;
     
     half4 frag(v2f i) : SV_Target
     {
+        return tex2D(_MainTex, i.posWorld.xz);
         //需要注意View空间左右手坐标系的转换
         float2 uv = (i.posWorld.xz - _ShallowWaterParams.xy) * _ShallowWaterParams.w * float2(1, -1) + float2(0.5, 0.5);
-        uv = saturate(uv);
 
         uv = saturate(uv);
         float inShowBound = uv.x > 0 && uv.y > 0 && uv.x < 1 && uv.y < 1;
         float inArea = inShowBound ? 1 : 0;
-        int uvXInt = floor(uv.x * _ShallowWaterSize);
-        int uvYInt = floor(uv.y * _ShallowWaterSize);
-        int index = uvYInt * _ShallowWaterSize + uvXInt;
-        float heightValue = -_ShallowWaterBuffer[index] * inArea;
 
-        int totalIndex = _ShallowWaterSize * _ShallowWaterSize;
-        
-        // int uvXInt = floor(uv.x * _ShallowWaterSize);
-        // int uvYInt = floor(uv.y * _ShallowWaterSize);
-        // int index = uvYInt * _ShallowWaterSize + uvXInt;
-        // float heightValue = -_ShallowWaterBuffer[index] * ValidIndex(index, totalIndex);
-
-        // int uvXInt = floor(uv.x * _ShallowWaterSize);
-        // int uvYInt = floor(uv.y * _ShallowWaterSize);
-        // int index = uvYInt * _ShallowWaterSize + uvXInt;
-        // int index1 = uvYInt * _ShallowWaterSize + uvXInt + 1;
-        // int index2 = uvYInt * _ShallowWaterSize + uvXInt - 1;
-        // int index3 = (uvYInt + 1) * _ShallowWaterSize + uvXInt;
-        // int index4 = (uvYInt - 1) * _ShallowWaterSize + uvXInt;
-        //
-        // float heightValue = -_ShallowWaterBuffer[index] * ValidIndex(index, totalIndex);
-        // heightValue += -_ShallowWaterBuffer[index1] * ValidIndex(index1, totalIndex);
-        // heightValue += -_ShallowWaterBuffer[index2] * ValidIndex(index2, totalIndex);
-        // heightValue += -_ShallowWaterBuffer[index3] * ValidIndex(index3, totalIndex);
-        // heightValue += -_ShallowWaterBuffer[index4] * ValidIndex(index4, totalIndex);
-        // heightValue *= 0.2;
-        
-        return heightValue;
+        float heightValue = -tex2D(_ShallowWaterHeightRT, uv).r;
+        return heightValue * inArea;
     }
     
     ENDHLSL

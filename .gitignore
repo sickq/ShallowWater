@@ -1,0 +1,12 @@
+#仅限Unity工程目录下面的忽略项，全局配置中已有的不需要重复配置了
+/*.csproj
+
+/Logs
+/Library
+/Temp
+/UserSettings
+/obj
+
+/Assets/Plugins/Editor.meta
+/Assets/Plugins/Editor/JetBrains
+/Assets/Plugins/Editor/JetBrains.meta
