@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -35,6 +36,7 @@ public class ShallowWater : MonoBehaviour
     public float TravelSpeed = 0.45f;
 
     public RenderTexture DepthRenderTexture;
+    public RenderTexture ShallowWaterHeightRT;
 
     private Material renderDepthMaterial;
 
@@ -92,12 +94,31 @@ public class ShallowWater : MonoBehaviour
 
         if (coreCameraTrans != null)
         {
+            if (DepthRenderTexture != null)
+            {
+                DepthRenderTexture.Release();
+                DepthRenderTexture = null;
+            }
+            
             if (DepthRenderTexture == null) 
             {
-                DepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-                DepthRenderTexture.enableRandomWrite = true;
-                DepthRenderTexture.name = "ShallowDepthRT";
+                DepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
+                DepthRenderTexture.name = "_ShallowDepthRT";
                 Shader.SetGlobalTexture("_ShallowHeightMap", DepthRenderTexture);
+            }
+
+            if (ShallowWaterHeightRT != null)
+            {
+                ShallowWaterHeightRT.Release();
+                ShallowWaterHeightRT = null;
+            }
+            
+            if (ShallowWaterHeightRT == null) 
+            {
+                ShallowWaterHeightRT = new RenderTexture(HeightMapSize, HeightMapSize, 0, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
+                ShallowWaterHeightRT.enableRandomWrite = true;
+                ShallowWaterHeightRT.name = "ShallowWaterHeightRT";
+                Shader.SetGlobalTexture("_ShallowWaterHeightRT", ShallowWaterHeightRT);
             }
 
             bufferQueue.Clear();
@@ -135,8 +156,14 @@ public class ShallowWater : MonoBehaviour
         cmdBuffer = null;
         if (DepthRenderTexture != null)
         {
-            DestroyObject(DepthRenderTexture);
+            DepthRenderTexture.Release();
             DepthRenderTexture = null;
+        }
+
+        if (ShallowWaterHeightRT != null)
+        {
+            ShallowWaterHeightRT.Release();
+            ShallowWaterHeightRT = null;
         }
 
         if (bufferA != null) bufferA.Release();
@@ -180,7 +207,10 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
             foreach (var renderer in renderers)
             {
-                cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
+                if (renderer.gameObject.activeInHierarchy && renderer.enabled)
+                {
+                    cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
+                }
             }
             cmdBuffer.EndSample("[ShallowWater]DrawDepth");
 
@@ -230,7 +260,8 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "CurrentBuffer", current);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "PrevBuffer", pre);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "PrevPrevBuffer", prepre);
-            
+            cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowWaterHeightRT", ShallowWaterHeightRT);
+
             cmdBuffer.DispatchCompute(shallowWaterComputeShader, csMainKernel, HeightMapSize / 8 + 1, HeightMapSize / 8 + 1, 1);
             cmdBuffer.EndSample("[ShallowWater]UpdateHeight");
             

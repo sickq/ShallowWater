@@ -24,12 +24,12 @@ Shader "Custom/ShallowDepth" {
 
     uniform float4 _ShallowWaterParams;
 
-    fixed4 frag(v2f i) : SV_Target
+    float4 frag(v2f i) : SV_Target
     {
         float depth = i.texPos.z;
         depth = clamp(-depth, 0, _ShallowWaterParams.z);
         depth = depth / _ShallowWaterParams.z;
-        return float4(EncodeFloatRG(depth), 0, 1);
+        return float4(depth, 0, 0, 1);
     }
     
     ENDCG

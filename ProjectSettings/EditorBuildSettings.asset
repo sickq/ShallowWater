@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/ShallowWater/ShallowWaterScene.unity
+    guid: 0e33cd8aeb2ca474aa461ffd7deddec7
   m_configObjects: {}

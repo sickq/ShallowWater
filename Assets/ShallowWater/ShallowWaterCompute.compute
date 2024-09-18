@@ -6,6 +6,8 @@
 RWStructuredBuffer<float> PrevPrevBuffer;
 RWStructuredBuffer<float> PrevBuffer;
 RWStructuredBuffer<float> CurrentBuffer;
+RWTexture2D<float> _ShallowWaterHeightRT;
+
 Texture2D _ShallowHeightMap;
 
 float4 _ShallowWaterParams;
@@ -24,12 +26,6 @@ float GetPrevBufferValue(int indexX, int indexY, float current)
     return PrevBuffer[index];
 }
 
-inline float DecodeFloatRG( float2 enc )
-{
-    float2 kDecodeDot = float2(1.0, 1/255.0);
-    return dot( enc, kDecodeDot );
-}
-
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
@@ -39,9 +35,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     }
     int index = id.x + id.y * _ShallowWaterSize;
 
-    float height = DecodeFloatRG(_ShallowHeightMap[id.xy].xy) * -1 * _ShallowWaterParams.z;
-    CurrentBuffer[index] = height;
+    float height = _ShallowHeightMap[id.xy] * -1 * _ShallowWaterParams.z;
+    float currentHeight = _ShallowWaterHeightRT[id.xy];
+    height = min(height, currentHeight);
     float prevHeight = PrevBuffer[index];
+    
     float nearHeightTotal = GetPrevBufferValue(id.x, id.y + 1, prevHeight) +
                             GetPrevBufferValue(id.x, id.y - 1, prevHeight) +
                             GetPrevBufferValue(id.x + 1, id.y, prevHeight) +
@@ -49,7 +47,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 
     float prevprevHeight = PrevPrevBuffer[index];
     float newHeight = Damping * (prevHeight + (prevHeight - prevprevHeight)) + TravelSpeed * (nearHeightTotal - prevHeight * 4);
-    CurrentBuffer[index] = max(-1, min(1, min(height, newHeight)));
+    CurrentBuffer[index] = min(height, newHeight);
+    _ShallowWaterHeightRT[id.xy] = CurrentBuffer[index];
 }
 
 RWStructuredBuffer<float> NewPrevPrevBuffer;
