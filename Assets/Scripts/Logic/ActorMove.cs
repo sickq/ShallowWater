@@ -16,7 +16,6 @@ public class ActorMove : MonoBehaviour
             if (Physics.Raycast(ray, out hit))
             {
                 targetPos = hit.point;
-                targetPos.y = transform.position.y;
             }
         }
         

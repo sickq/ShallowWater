@@ -35,6 +35,9 @@ public class ShallowWater : MonoBehaviour
     [Range(0, 0.5f)]
     public float TravelSpeed = 0.45f;
 
+    [Range(0, 5)]
+    public float ShallowWaterMaxDepth = 1;
+
     public RenderTexture DepthRenderTexture;
     public RenderTexture ShallowWaterHeightRT;
 
@@ -117,7 +120,8 @@ public class ShallowWater : MonoBehaviour
             {
                 ShallowWaterHeightRT = new RenderTexture(HeightMapSize, HeightMapSize, 0, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
                 ShallowWaterHeightRT.enableRandomWrite = true;
-                ShallowWaterHeightRT.name = "ShallowWaterHeightRT";
+                ShallowWaterHeightRT.name = "_ShallowWaterHeightRT";
+                ShallowWaterHeightRT.Create();
                 Shader.SetGlobalTexture("_ShallowWaterHeightRT", ShallowWaterHeightRT);
             }
 
@@ -182,7 +186,7 @@ public class ShallowWater : MonoBehaviour
         
         if (renderDepthMaterial != null)
         {
-            DestroyObject(renderDepthMaterial);
+            SWDestroyObject(renderDepthMaterial);
             renderDepthMaterial = null;
         }
     }
@@ -254,7 +258,7 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer.SetComputeFloatParam(shallowWaterComputeShader, "Damping", Damping);
             cmdBuffer.SetComputeFloatParam(shallowWaterComputeShader, "TravelSpeed", TravelSpeed);
             
-            cmdBuffer.SetComputeVectorParam(shallowWaterComputeShader, "_ShallowWaterParams", new Vector4(transform.position.x, transform.position.z, curCamera.farClipPlane, 1.0f / orthographicSize));
+            cmdBuffer.SetComputeVectorParam(shallowWaterComputeShader, "_ShallowWaterParams1", new Vector4(curCamera.farClipPlane, -ShallowWaterMaxDepth, 0, 1.0f / orthographicSize));
             
             cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowHeightMap", DepthRenderTexture);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "CurrentBuffer", current);
@@ -267,7 +271,6 @@ public class ShallowWater : MonoBehaviour
             
             Graphics.ExecuteCommandBuffer(cmdBuffer);
 
-            WaterTarget.GetComponent<Renderer>().sharedMaterial.SetBuffer("_ShallowWaterBuffer", current);
             WaterTarget.GetComponent<Renderer>().sharedMaterial.SetInt("_ShallowWaterSize", HeightMapSize);
         }
         Profiler.EndSample();
@@ -305,7 +308,7 @@ public class ShallowWater : MonoBehaviour
         return curCameraMoved;
     }
     
-    public static void DestroyObject(Object obj)
+    public static void SWDestroyObject(Object obj)
     {
 #if UNITY_EDITOR
         if (Application.isPlaying)

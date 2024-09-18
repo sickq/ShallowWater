@@ -10,17 +10,17 @@ RWTexture2D<float> _ShallowWaterHeightRT;
 
 Texture2D _ShallowHeightMap;
 
-float4 _ShallowWaterParams;
+float4 _ShallowWaterParams1;
 
 int _ShallowWaterSize;
 float TravelSpeed;
 float Damping;
 
-float GetPrevBufferValue(int indexX, int indexY, float current)
+float GetPrevBufferValue(int indexX, int indexY, float fallbackValue)
 {
     if(indexX < 0 || indexX > _ShallowWaterSize - 1 || indexY < 0 || indexY > _ShallowWaterSize - 1)
     {
-        return current;
+        return fallbackValue;
     }
     int index = indexX + indexY * _ShallowWaterSize;
     return PrevBuffer[index];
@@ -35,20 +35,23 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     }
     int index = id.x + id.y * _ShallowWaterSize;
 
-    float height = _ShallowHeightMap[id.xy] * -1 * _ShallowWaterParams.z;
-    float currentHeight = _ShallowWaterHeightRT[id.xy];
-    height = min(height, currentHeight);
-    float prevHeight = PrevBuffer[index];
+    float height = _ShallowHeightMap[id.xy] * -1 * _ShallowWaterParams1.x;
     
+    float prevHeight = PrevBuffer[index];
     float nearHeightTotal = GetPrevBufferValue(id.x, id.y + 1, prevHeight) +
                             GetPrevBufferValue(id.x, id.y - 1, prevHeight) +
                             GetPrevBufferValue(id.x + 1, id.y, prevHeight) +
                             GetPrevBufferValue(id.x - 1, id.y, prevHeight);
 
     float prevprevHeight = PrevPrevBuffer[index];
-    float newHeight = Damping * (prevHeight + (prevHeight - prevprevHeight)) + TravelSpeed * (nearHeightTotal - prevHeight * 4);
-    CurrentBuffer[index] = min(height, newHeight);
-    _ShallowWaterHeightRT[id.xy] = CurrentBuffer[index];
+    float outHeight = Damping * (prevHeight + (prevHeight - prevprevHeight)) + TravelSpeed * (nearHeightTotal - prevHeight * 4);
+    if(height < 0)
+    {
+        outHeight = min(height, outHeight);
+    }
+    outHeight = max(outHeight, _ShallowWaterParams1.y);
+    CurrentBuffer[index] = outHeight;
+    _ShallowWaterHeightRT[id.xy] = outHeight;
 }
 
 RWStructuredBuffer<float> NewPrevPrevBuffer;
