@@ -25,14 +25,15 @@ Shader "Custom/ShowShallowDepth" {
         v2f o;
         o.posWorld = mul(unity_ObjectToWorld, v.vertex);
 
-        //需要注意View空间左右手坐标系的转换
-        float2 uv = (o.posWorld.xz - _ShallowWaterParams.xy) * _ShallowWaterParams.w * float2(1, -1) + float2(0.5, 0.5);
-
-        uv = saturate(uv);
-        float inShowBound = uv.x > 0 && uv.y > 0 && uv.x < 1 && uv.y < 1;
-        float inArea = inShowBound ? 1 : 0;
-
-        float heightValue = tex2Dlod(_ShallowWaterHeightRT, float4(uv, 0, 0)).r * inArea;
+        half2 offset = half2(1, 1);
+        #if SHADER_API_D3D11
+            offset = half2(1, -1);
+        #endif
+        
+        //需要DX下的UV差异
+        float2 uv = saturate((o.posWorld.xz - _ShallowWaterParams.xy) * _ShallowWaterParams.w * offset + float2(0.5, 0.5));
+        
+        float heightValue = tex2Dlod(_ShallowWaterHeightRT, float4(uv, 0, 0)).r;
         o.posWorld.y += heightValue;
 
         o.vertex = mul(UNITY_MATRIX_VP, o.posWorld);
@@ -44,15 +45,6 @@ Shader "Custom/ShowShallowDepth" {
     half4 frag(v2f i) : SV_Target
     {
         return tex2D(_MainTex, i.posWorld.xz);
-        //需要注意View空间左右手坐标系的转换
-        float2 uv = (i.posWorld.xz - _ShallowWaterParams.xy) * _ShallowWaterParams.w * float2(1, -1) + float2(0.5, 0.5);
-
-        uv = saturate(uv);
-        float inShowBound = uv.x > 0 && uv.y > 0 && uv.x < 1 && uv.y < 1;
-        float inArea = inShowBound ? 1 : 0;
-
-        float heightValue = -tex2D(_ShallowWaterHeightRT, uv).r;
-        return heightValue * inArea;
     }
     
     ENDHLSL

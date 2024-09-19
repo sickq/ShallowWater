@@ -26,7 +26,10 @@ public class ShallowWater : MonoBehaviour
     public Transform WaterTarget;
     
     //需要计算深度的Renderer
-    public List<Renderer> renderers;
+    public List<Renderer> objRenderers;
+    
+    //边缘水面反弹的Renderer
+    public List<Renderer> boundRenderers;
     
     [Header("浅水方程迭代参数")]
     [Range(0, 1.0f)]
@@ -38,7 +41,8 @@ public class ShallowWater : MonoBehaviour
     [Range(0, 5)]
     public float ShallowWaterMaxDepth = 1;
 
-    public RenderTexture DepthRenderTexture;
+    public RenderTexture ObjDepthRenderTexture;
+    public RenderTexture BoundDepthRenderTexture;
     public RenderTexture ShallowWaterHeightRT;
 
     private Material renderDepthMaterial;
@@ -50,9 +54,6 @@ public class ShallowWater : MonoBehaviour
     
     private Camera curCamera;
     private Vector3 curCameraPos;
-
-    private RenderTexture heightMapRT;
-    
     
     private ComputeBuffer bufferA;
     private ComputeBuffer bufferB;
@@ -63,11 +64,11 @@ public class ShallowWater : MonoBehaviour
     private ComputeBuffer bufferC2;
     
     private Queue<ComputeBuffer> bufferQueue = new Queue<ComputeBuffer>();
+    private Queue<ComputeBuffer> backupBufferQueue = new Queue<ComputeBuffer>();
+    
     private int csMainKernel;
     private int csUpdateBufferKernal;
     private CommandBuffer cmdBuffer;
-
-    private Queue<ComputeBuffer> backupBufferQueue = new Queue<ComputeBuffer>();
 
     private void OnEnable() 
     {
@@ -76,10 +77,7 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer = new CommandBuffer { name = "ShallowWater" };
         }
 
-        if (renderDepthMaterial != null)
-        {
-            DestroyObject(renderDepthMaterial);
-        }
+        ShallowWaterUtils.ReleaseMaterial(renderDepthMaterial);
         renderDepthMaterial = new Material(renderDepthShader);
         
         csMainKernel = shallowWaterComputeShader.FindKernel("CSMain");
@@ -97,43 +95,33 @@ public class ShallowWater : MonoBehaviour
 
         if (coreCameraTrans != null)
         {
-            if (DepthRenderTexture != null)
-            {
-                DepthRenderTexture.Release();
-                DepthRenderTexture = null;
-            }
-            
-            if (DepthRenderTexture == null) 
-            {
-                DepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
-                DepthRenderTexture.name = "_ShallowDepthRT";
-                Shader.SetGlobalTexture("_ShallowHeightMap", DepthRenderTexture);
-            }
+            ShallowWaterUtils.ReleaseRT(ObjDepthRenderTexture);
+            ObjDepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.RHalf, RenderTextureReadWrite.Linear);
+            ObjDepthRenderTexture.name = "_ObjShallowDepthRT";
+            ObjDepthRenderTexture.Create();
 
-            if (ShallowWaterHeightRT != null)
-            {
-                ShallowWaterHeightRT.Release();
-                ShallowWaterHeightRT = null;
-            }
-            
-            if (ShallowWaterHeightRT == null) 
-            {
-                ShallowWaterHeightRT = new RenderTexture(HeightMapSize, HeightMapSize, 0, RenderTextureFormat.RFloat, RenderTextureReadWrite.Linear);
-                ShallowWaterHeightRT.enableRandomWrite = true;
-                ShallowWaterHeightRT.name = "_ShallowWaterHeightRT";
-                ShallowWaterHeightRT.Create();
-                Shader.SetGlobalTexture("_ShallowWaterHeightRT", ShallowWaterHeightRT);
-            }
+            ShallowWaterUtils.ReleaseRT(BoundDepthRenderTexture);
+            BoundDepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.RHalf, RenderTextureReadWrite.Linear);
+            BoundDepthRenderTexture.name = "_BoundShallowDepthRT";
+            BoundDepthRenderTexture.Create();
+
+            ShallowWaterUtils.ReleaseRT(ShallowWaterHeightRT);
+            ShallowWaterHeightRT = new RenderTexture(HeightMapSize + 2, HeightMapSize + 2, 0, GraphicsFormat.R32_SFloat, 0);
+            ShallowWaterHeightRT.enableRandomWrite = true;
+            ShallowWaterHeightRT.name = "_ShallowWaterHeightRT";
+            ShallowWaterHeightRT.Create();
+            Shader.SetGlobalTexture("_ShallowWaterHeightRT", ShallowWaterHeightRT);
 
             bufferQueue.Clear();
+            backupBufferQueue.Clear();
             
-            if (bufferA != null) bufferA.Release();
-            if (bufferB != null) bufferB.Release();
-            if (bufferC != null) bufferC.Release();
-            
-            if (bufferA2 != null) bufferA2.Release();
-            if (bufferB2 != null) bufferB2.Release();
-            if (bufferC2 != null) bufferC2.Release();
+            ShallowWaterUtils.ReleaseComputeBuffer(bufferA);
+            ShallowWaterUtils.ReleaseComputeBuffer(bufferB);
+            ShallowWaterUtils.ReleaseComputeBuffer(bufferC);
+
+            ShallowWaterUtils.ReleaseComputeBuffer(bufferA2);
+            ShallowWaterUtils.ReleaseComputeBuffer(bufferB2);
+            ShallowWaterUtils.ReleaseComputeBuffer(bufferC2);
 
             int bufferDataCount = HeightMapSize * HeightMapSize;
             bufferA = new ComputeBuffer(bufferDataCount, Marshal.SizeOf<float>());
@@ -158,40 +146,68 @@ public class ShallowWater : MonoBehaviour
     {
         cmdBuffer.Release();
         cmdBuffer = null;
-        if (DepthRenderTexture != null)
-        {
-            DepthRenderTexture.Release();
-            DepthRenderTexture = null;
-        }
+        ShallowWaterUtils.ReleaseRT(ObjDepthRenderTexture);
+        ShallowWaterUtils.ReleaseRT(BoundDepthRenderTexture);
+        ShallowWaterUtils.ReleaseRT(ShallowWaterHeightRT);
 
-        if (ShallowWaterHeightRT != null)
-        {
-            ShallowWaterHeightRT.Release();
-            ShallowWaterHeightRT = null;
-        }
+        ShallowWaterUtils.ReleaseComputeBuffer(bufferA);
+        ShallowWaterUtils.ReleaseComputeBuffer(bufferB);
+        ShallowWaterUtils.ReleaseComputeBuffer(bufferC);
 
-        if (bufferA != null) bufferA.Release();
-        if (bufferB != null) bufferB.Release();
-        if (bufferC != null) bufferC.Release();
-        
+        ShallowWaterUtils.ReleaseComputeBuffer(bufferA2);
+        ShallowWaterUtils.ReleaseComputeBuffer(bufferB2);
+        ShallowWaterUtils.ReleaseComputeBuffer(bufferC2);
+
         bufferQueue.Clear();
-            
-        if (bufferA2 != null) bufferA2.Release();
-        if (bufferB2 != null) bufferB2.Release();
-        if (bufferC2 != null) bufferC2.Release();
-        
         backupBufferQueue.Clear();
         
         coreCameraTrans = null;
-        
-        if (renderDepthMaterial != null)
+
+        ShallowWaterUtils.ReleaseMaterial(renderDepthMaterial);
+    }
+
+    private readonly List<Renderer> outputRenderers = new List<Renderer>();
+    private List<Renderer> GetObjMovedRenderers(bool force = false)
+    {
+        if (force)
         {
-            SWDestroyObject(renderDepthMaterial);
-            renderDepthMaterial = null;
+            return objRenderers;
         }
+        outputRenderers.Clear();
+
+        foreach (var item in objRenderers)
+        {
+            if (item.enabled && item.gameObject.activeInHierarchy && item.transform.hasChanged)
+            {
+                outputRenderers.Add(item);
+                item.transform.hasChanged = false;
+            }
+        }
+
+        return outputRenderers;
     }
     
-    private void Update()
+    private List<Renderer> GetBoundRenderers(bool force = false)
+    {
+        if (force)
+        {
+            return boundRenderers;
+        }
+        outputRenderers.Clear();
+
+        foreach (var item in boundRenderers)
+        {
+            if (item.enabled && item.gameObject.activeInHierarchy && item.transform.hasChanged)
+            {
+                outputRenderers.Add(item);
+                item.transform.hasChanged = false;
+            }
+        }
+
+        return outputRenderers;
+    }
+
+    private void LateUpdate()
     {
         Profiler.BeginSample("[ShallowWater]CPUUpdate");
         if (coreCameraTrans != null)
@@ -204,19 +220,36 @@ public class ShallowWater : MonoBehaviour
             Shader.SetGlobalVector("_ShallowWaterParams", new Vector4(position.x, position.z, curCamera.farClipPlane, 1.0f / orthographicSize));
             
             cmdBuffer.Clear();
-            cmdBuffer.BeginSample("[ShallowWater]DrawDepth");
-            cmdBuffer.SetRenderTarget(DepthRenderTexture);
+            bool force = true;
+            cmdBuffer.BeginSample("[ShallowWater]DrawObjMoveDepth");
+            cmdBuffer.SetRenderTarget(ObjDepthRenderTexture);
             cmdBuffer.ClearRenderTarget(true, true, Color.black);
-            Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
-            cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
-            foreach (var renderer in renderers)
+            var movedRenderers = GetObjMovedRenderers(shallowCameraMoved);
+            if (movedRenderers.Count > 0)
             {
-                if (renderer.gameObject.activeInHierarchy && renderer.enabled)
+                Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
+                cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
+                foreach (var renderer in movedRenderers)
                 {
                     cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
                 }
             }
-            cmdBuffer.EndSample("[ShallowWater]DrawDepth");
+            cmdBuffer.EndSample("[ShallowWater]DrawObjMoveDepth");
+
+            var boundRenderers = GetBoundRenderers(shallowCameraMoved);
+            if (boundRenderers.Count > 0)
+            {
+                cmdBuffer.BeginSample("[ShallowWater]DrawBoundDepth");
+                cmdBuffer.SetRenderTarget(BoundDepthRenderTexture);
+                cmdBuffer.ClearRenderTarget(true, true, Color.black);
+                Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
+                cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
+                foreach (var renderer in boundRenderers)
+                {
+                    cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
+                }
+                cmdBuffer.EndSample("[ShallowWater]DrawBoundDepth");
+            }
 
             var current = bufferQueue.Dequeue();
             var pre = bufferQueue.Dequeue();
@@ -260,7 +293,8 @@ public class ShallowWater : MonoBehaviour
             
             cmdBuffer.SetComputeVectorParam(shallowWaterComputeShader, "_ShallowWaterParams1", new Vector4(curCamera.farClipPlane, -ShallowWaterMaxDepth, 0, 1.0f / orthographicSize));
             
-            cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowHeightMap", DepthRenderTexture);
+            cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowObjDepthTexture", ObjDepthRenderTexture);
+            cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowBoundDepthTexture", BoundDepthRenderTexture);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "CurrentBuffer", current);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "PrevBuffer", pre);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "PrevPrevBuffer", prepre);
@@ -307,8 +341,34 @@ public class ShallowWater : MonoBehaviour
 
         return curCameraMoved;
     }
-    
-    public static void SWDestroyObject(Object obj)
+
+    private void OnDrawGizmos()
+    {
+        Gizmos.color = Color.red;
+        var position = transform.position;
+        Gizmos.DrawWireCube(new Vector3(position.x, position.y - curCamera.farClipPlane / 2, position.z), new Vector3(curCamera.orthographicSize * 2, curCamera.farClipPlane, curCamera.orthographicSize * 2));
+    }
+}
+
+public class ShallowWaterUtils
+{
+    public static void ReleaseRT(RenderTexture rt)
+    {
+        if (rt != null)
+        {
+            rt.Release();
+        }
+    }
+
+    public static void ReleaseComputeBuffer(ComputeBuffer buffer)
+    {
+        if (buffer != null)
+        {
+            buffer.Release();
+        }
+    }
+
+    public static void DestroyObject(Object obj)
     {
 #if UNITY_EDITOR
         if (Application.isPlaying)
@@ -323,11 +383,49 @@ public class ShallowWater : MonoBehaviour
             Object.Destroy(obj);
 #endif
     }
-
-    private void OnDrawGizmos()
+    
+    public static void ReleaseMaterial(Material material)
     {
-        Gizmos.color = Color.red;
-        var position = transform.position;
-        Gizmos.DrawWireCube(new Vector3(position.x, position.y - curCamera.farClipPlane / 2, position.z), new Vector3(curCamera.orthographicSize * 2, curCamera.farClipPlane, curCamera.orthographicSize * 2));
+        if (material != null)
+        {
+            DestroyObject(material);
+            material = null;
+        }
+    }
+}
+
+public class RTPingPongBuffer
+{
+    private RenderTexture rt1;
+    private RenderTexture rt2;
+
+    private bool rt1IsFront = true;
+    public RenderTexture frontRT => rt1IsFront ? rt1 : rt2;
+    public RenderTexture backRT => rt1IsFront ? rt2 : rt1;
+
+    public RTPingPongBuffer(string name, int width, int height, int depth, GraphicsFormat format, bool randomWrite = false, int mipmap = 0)
+    {
+        rt1 = new RenderTexture(width, height, depth, format, mipmap);
+        rt1.enableRandomWrite = randomWrite;
+        rt1.name = name + "_Buffer1";
+        rt1.Create();
+        rt2 = new RenderTexture(width, height, depth, format, mipmap);
+        rt2.name = name + "_Buffer2";
+        rt2.enableRandomWrite = randomWrite;
+        rt2.Create();
+    }
+
+    public void Dispose()
+    {
+        rt1.Release();
+        rt1 = null;
+        
+        rt2.Release();
+        rt2 = null;
+    }
+    
+    public void SwapBuffer()
+    {
+        rt1IsFront = !rt1IsFront;
     }
 }

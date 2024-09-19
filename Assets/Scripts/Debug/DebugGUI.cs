@@ -1,30 +1,42 @@
+using System;
 using UnityEngine;
 
 public class DebugGUI : MonoBehaviour
 {
-    private GameObject shallowWater;
+    private ShallowWater shallowWater;
+
+    private void Awake()
+    {
+        if (shallowWater == null)
+        {
+            shallowWater = GameObject.Find("ShallowWater").GetComponent<ShallowWater>();
+        }
+    }
+
     private void OnGUI()
     {
-        if (GUILayout.Button("Reset ResetShallowWater", GUILayout.Width(200), GUILayout.Height(100)))
+        if (GUILayout.Button("Active ResetShallowWater", GUILayout.Width(200), GUILayout.Height(100)))
         {
-            if (shallowWater == null)
-            {
-                shallowWater = GameObject.Find("ShallowWater");
-            }
-            var ShallowWater = shallowWater.GetComponent<ShallowWater>();
+            shallowWater.enabled = !shallowWater.enabled;
+        }
+        
+        if (GUILayout.Button("Frame60", GUILayout.Width(200), GUILayout.Height(100)))
+        {
+            Application.targetFrameRate = 60;
+        }
 
-            ShallowWater.enabled = !ShallowWater.enabled;
-        }
+        GUILayout.Space(10);
+        shallowWater.Damping = GUILayout.HorizontalSlider(shallowWater.Damping, 0, 1.0f, GUILayout.Width(200), GUILayout.Height(30));
+        shallowWater.Damping = float.Parse(GUILayout.TextArea(shallowWater.Damping.ToString(), GUILayout.Width(200), GUILayout.Height(30)));
+        GUILayout.Space(10);
+        shallowWater.TravelSpeed = GUILayout.HorizontalSlider(shallowWater.TravelSpeed, 0, 0.5f, GUILayout.Width(200), GUILayout.Height(30));
+        shallowWater.TravelSpeed = float.Parse(GUILayout.TextArea(shallowWater.TravelSpeed.ToString(), GUILayout.Width(200), GUILayout.Height(30)));
         
-        if (GUILayout.Button("Active ShallowWater", GUILayout.Width(200), GUILayout.Height(100)))
-        {
-            if (shallowWater == null)
-            {
-                shallowWater = GameObject.Find("ShallowWater");
-            }
-            shallowWater.SetActive(!shallowWater.activeSelf);
-        }
-        
+        GUILayout.Space(10);
+        shallowWater.ShallowWaterMaxDepth = GUILayout.HorizontalSlider(shallowWater.ShallowWaterMaxDepth, 0, 5f, GUILayout.Width(200), GUILayout.Height(30));
+        shallowWater.ShallowWaterMaxDepth = float.Parse(GUILayout.TextArea(shallowWater.ShallowWaterMaxDepth.ToString(), GUILayout.Width(200), GUILayout.Height(30)));
+        GUILayout.Space(10);
+
         GUILayout.Label($"SystemInfo.supportsComputeShaders {SystemInfo.supportsComputeShaders}");
         GUILayout.Label($"SystemInfo.supportedRandomWriteTargetCount {SystemInfo.supportedRandomWriteTargetCount}");
         GUILayout.Label($"SystemInfo.supportsIndirectArgumentsBuffer {SystemInfo.supportsIndirectArgumentsBuffer}");

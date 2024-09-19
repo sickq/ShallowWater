@@ -8,7 +8,11 @@ RWStructuredBuffer<float> PrevBuffer;
 RWStructuredBuffer<float> CurrentBuffer;
 RWTexture2D<float> _ShallowWaterHeightRT;
 
-Texture2D _ShallowHeightMap;
+//移动物体的深度图，仅在移动的时候渲染
+Texture2D _ShallowObjDepthTexture;
+
+//边界深度图，做水面边界交互使用
+Texture2D _ShallowBoundDepthTexture;
 
 float4 _ShallowWaterParams1;
 
@@ -18,10 +22,15 @@ float Damping;
 
 float GetPrevBufferValue(int indexX, int indexY, float fallbackValue)
 {
-    if(indexX < 0 || indexX > _ShallowWaterSize - 1 || indexY < 0 || indexY > _ShallowWaterSize - 1)
+    indexX = max(0, min(indexX, _ShallowWaterSize - 1));
+    indexY = max(0, min(indexY, _ShallowWaterSize - 1));
+    uint2 indexXY = uint2(indexX, indexY);
+    float boundValue = _ShallowBoundDepthTexture[indexXY];
+    if(boundValue != 0)
     {
         return fallbackValue;
     }
+    
     int index = indexX + indexY * _ShallowWaterSize;
     return PrevBuffer[index];
 }
@@ -35,7 +44,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     }
     int index = id.x + id.y * _ShallowWaterSize;
 
-    float height = _ShallowHeightMap[id.xy] * -1 * _ShallowWaterParams1.x;
+    float height = _ShallowObjDepthTexture[id.xy] * -1 * _ShallowWaterParams1.x;
     
     float prevHeight = PrevBuffer[index];
     float nearHeightTotal = GetPrevBufferValue(id.x, id.y + 1, prevHeight) +
@@ -51,7 +60,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     }
     outHeight = max(outHeight, _ShallowWaterParams1.y);
     CurrentBuffer[index] = outHeight;
-    _ShallowWaterHeightRT[id.xy] = outHeight;
+
+    //边缘偏移1像素，保证边缘像素为黑色，防止贴图采样的时候，因为边缘的值不准确导致的边缘问题
+    uint2 offsetIndex = uint2(id.x + 1, id.y + 1);
+    
+    _ShallowWaterHeightRT[offsetIndex] = outHeight;
 }
 
 RWStructuredBuffer<float> NewPrevPrevBuffer;
@@ -69,8 +82,13 @@ void UpdateBufferCS (uint3 id : SV_DispatchThreadID)
     }
     int index = id.x + id.y * _ShallowWaterSize;
 
+    half2 offset = half2(1, 1);
+    #if SHADER_API_D3D11
+        offset = half2(1, -1);
+    #endif
+    
     int beforeXIndex = id.x + floor(_ShallowBufferUpdateParams.x * _ShallowWaterSize);
-    int beforeYIndex = id.y - floor(_ShallowBufferUpdateParams.y * _ShallowWaterSize);
+    int beforeYIndex = id.y + offset.y * floor(_ShallowBufferUpdateParams.y * _ShallowWaterSize);
 
     if(beforeXIndex < 0 || beforeXIndex >= _ShallowWaterSize ||
        beforeYIndex < 0 || beforeYIndex >= _ShallowWaterSize)
