@@ -70,8 +70,15 @@ public class ShallowWater : MonoBehaviour
     private int csUpdateBufferKernal;
     private CommandBuffer cmdBuffer;
 
-    private void OnEnable() 
+    private void OnEnable()
     {
+        if (!SystemInfo.supportsComputeShaders)
+        {
+            this.enabled = false;
+            Debug.LogError("UnSupport ComputeShaders");
+            return;
+        }
+        
         if (cmdBuffer == null)
         {
             cmdBuffer = new CommandBuffer { name = "ShallowWater" };

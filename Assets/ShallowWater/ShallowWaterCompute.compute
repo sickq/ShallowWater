@@ -22,8 +22,12 @@ float Damping;
 
 float GetPrevBufferValue(int indexX, int indexY, float fallbackValue)
 {
-    indexX = max(0, min(indexX, _ShallowWaterSize - 1));
-    indexY = max(0, min(indexY, _ShallowWaterSize - 1));
+    if(indexX <= 0 || indexX >= _ShallowWaterSize - 1 || indexY <= 0 || indexY >= _ShallowWaterSize - 1)
+    {
+        return 0;
+    }
+    // indexX = max(0, min(indexX, _ShallowWaterSize - 1));
+    // indexY = max(0, min(indexY, _ShallowWaterSize - 1));
     uint2 indexXY = uint2(indexX, indexY);
     float boundValue = _ShallowBoundDepthTexture[indexXY];
     if(boundValue != 0)
@@ -42,6 +46,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     {
         return;
     }
+    
     int index = id.x + id.y * _ShallowWaterSize;
 
     float height = _ShallowObjDepthTexture[id.xy] * -1 * _ShallowWaterParams1.x;
