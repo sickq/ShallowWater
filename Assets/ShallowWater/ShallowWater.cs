@@ -41,6 +41,7 @@ public class ShallowWater : MonoBehaviour
     [Range(0, 5)]
     public float ShallowWaterMaxDepth = 1;
 
+    public RenderTexture ShallowCameraDepthBuffer;
     public RenderTexture ObjDepthRenderTexture;
     public RenderTexture BoundDepthRenderTexture;
     public RenderTexture ShallowWaterHeightRT;
@@ -102,13 +103,19 @@ public class ShallowWater : MonoBehaviour
 
         if (coreCameraTrans != null)
         {
+            ShallowWaterUtils.ReleaseRT(ShallowCameraDepthBuffer);
+            ShallowCameraDepthBuffer = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.Depth, RenderTextureReadWrite.Linear);
+            ShallowCameraDepthBuffer.name = "_ShallowCameraDepthBufferRT";
+            ShallowCameraDepthBuffer.Create();
+            
+            
             ShallowWaterUtils.ReleaseRT(ObjDepthRenderTexture);
-            ObjDepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.RHalf, RenderTextureReadWrite.Linear);
+            ObjDepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear);
             ObjDepthRenderTexture.name = "_ObjShallowDepthRT";
             ObjDepthRenderTexture.Create();
 
             ShallowWaterUtils.ReleaseRT(BoundDepthRenderTexture);
-            BoundDepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 16, RenderTextureFormat.RHalf, RenderTextureReadWrite.Linear);
+            BoundDepthRenderTexture = new RenderTexture(HeightMapSize, HeightMapSize, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear);
             BoundDepthRenderTexture.name = "_BoundShallowDepthRT";
             BoundDepthRenderTexture.Create();
 
@@ -153,6 +160,7 @@ public class ShallowWater : MonoBehaviour
     {
         cmdBuffer.Release();
         cmdBuffer = null;
+        ShallowWaterUtils.ReleaseRT(ShallowCameraDepthBuffer);
         ShallowWaterUtils.ReleaseRT(ObjDepthRenderTexture);
         ShallowWaterUtils.ReleaseRT(BoundDepthRenderTexture);
         ShallowWaterUtils.ReleaseRT(ShallowWaterHeightRT);
@@ -229,7 +237,7 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer.Clear();
             bool force = true;
             cmdBuffer.BeginSample("[ShallowWater]DrawObjMoveDepth");
-            cmdBuffer.SetRenderTarget(ObjDepthRenderTexture);
+            cmdBuffer.SetRenderTarget(ObjDepthRenderTexture, ShallowCameraDepthBuffer.depthBuffer);
             cmdBuffer.ClearRenderTarget(true, true, Color.black);
             var movedRenderers = GetObjMovedRenderers(shallowCameraMoved);
             if (movedRenderers.Count > 0)
@@ -247,7 +255,7 @@ public class ShallowWater : MonoBehaviour
             if (boundRenderers.Count > 0)
             {
                 cmdBuffer.BeginSample("[ShallowWater]DrawBoundDepth");
-                cmdBuffer.SetRenderTarget(BoundDepthRenderTexture);
+                cmdBuffer.SetRenderTarget(BoundDepthRenderTexture, ShallowCameraDepthBuffer.depthBuffer);
                 cmdBuffer.ClearRenderTarget(true, true, Color.black);
                 Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
                 cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
