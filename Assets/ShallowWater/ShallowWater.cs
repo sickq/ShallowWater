@@ -28,6 +28,9 @@ public class ShallowWater : MonoBehaviour
     //需要计算深度的Renderer
     public List<Renderer> objRenderers;
     
+    [Header("是否需要Bound的物体")]
+    public bool NeedBoundRenderers = true;
+    
     //边缘水面反弹的Renderer
     public List<Renderer> boundRenderers;
     
@@ -70,6 +73,9 @@ public class ShallowWater : MonoBehaviour
     private int csMainKernel;
     private int csUpdateBufferKernal;
     private CommandBuffer cmdBuffer;
+    
+    private LocalKeyword enableShallowBoundKeyword;
+    private bool lastNeedBoundRenderers;
 
     private void OnEnable()
     {
@@ -90,6 +96,8 @@ public class ShallowWater : MonoBehaviour
         
         csMainKernel = shallowWaterComputeShader.FindKernel("CSMain");
         csUpdateBufferKernal = shallowWaterComputeShader.FindKernel("UpdateBufferCS");
+        
+        enableShallowBoundKeyword = new LocalKeyword(shallowWaterComputeShader, "ENABLE_SHALLOW_WATER_BOUND");
 
         curCamera = GetComponent<Camera>();
         curCamera.orthographic = true;
@@ -228,12 +236,13 @@ public class ShallowWater : MonoBehaviour
         if (coreCameraTrans != null)
         {
             var orthographicSize = curCamera.orthographicSize * 2;
-
             bool shallowCameraMoved = UpdateCurCameraTrans();
-
             var position = transform.position;
+            
             Shader.SetGlobalVector("_ShallowWaterParams", new Vector4(position.x, position.z, curCamera.farClipPlane, 1.0f / orthographicSize));
             
+            WaterTarget.GetComponent<Renderer>().sharedMaterial.SetInt("_ShallowWaterSize", HeightMapSize);
+
             cmdBuffer.Clear();
             bool force = true;
             cmdBuffer.BeginSample("[ShallowWater]DrawObjMoveDepth");
@@ -244,6 +253,8 @@ public class ShallowWater : MonoBehaviour
             {
                 Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
                 cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
+                
+                //TODO 优化可以考虑 使用GPU Instancing代替DrawRenderer
                 foreach (var renderer in movedRenderers)
                 {
                     cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
@@ -251,19 +262,29 @@ public class ShallowWater : MonoBehaviour
             }
             cmdBuffer.EndSample("[ShallowWater]DrawObjMoveDepth");
 
-            var boundRenderers = GetBoundRenderers(shallowCameraMoved);
-            if (boundRenderers.Count > 0)
+            if (NeedBoundRenderers)
             {
-                cmdBuffer.BeginSample("[ShallowWater]DrawBoundDepth");
-                cmdBuffer.SetRenderTarget(BoundDepthRenderTexture, ShallowCameraDepthBuffer.depthBuffer);
-                cmdBuffer.ClearRenderTarget(true, true, Color.black);
-                Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
-                cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
-                foreach (var renderer in boundRenderers)
+                cmdBuffer.SetKeyword(shallowWaterComputeShader, enableShallowBoundKeyword, true);
+                var boundRenderers = GetBoundRenderers(shallowCameraMoved || !lastNeedBoundRenderers);
+                if (boundRenderers.Count > 0)
                 {
-                    cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
+                    cmdBuffer.BeginSample("[ShallowWater]DrawBoundDepth");
+                    cmdBuffer.SetRenderTarget(BoundDepthRenderTexture, ShallowCameraDepthBuffer.depthBuffer);
+                    cmdBuffer.ClearRenderTarget(true, true, Color.black);
+                    Matrix4x4 projectionMatrix = GL.GetGPUProjectionMatrix(curCamera.projectionMatrix, true);
+                    cmdBuffer.SetViewProjectionMatrices(curCamera.worldToCameraMatrix, projectionMatrix);
+                    foreach (var renderer in boundRenderers)
+                    {
+                        cmdBuffer.DrawRenderer(renderer, renderDepthMaterial);
+                    }
+                    cmdBuffer.EndSample("[ShallowWater]DrawBoundDepth");
                 }
-                cmdBuffer.EndSample("[ShallowWater]DrawBoundDepth");
+                lastNeedBoundRenderers = true;
+            }
+            else
+            {
+                cmdBuffer.SetKeyword(shallowWaterComputeShader, enableShallowBoundKeyword, false);
+                lastNeedBoundRenderers = false;
             }
 
             var current = bufferQueue.Dequeue();
@@ -309,7 +330,10 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer.SetComputeVectorParam(shallowWaterComputeShader, "_ShallowWaterParams1", new Vector4(curCamera.farClipPlane, -ShallowWaterMaxDepth, 0, 1.0f / orthographicSize));
             
             cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowObjDepthTexture", ObjDepthRenderTexture);
-            cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowBoundDepthTexture", BoundDepthRenderTexture);
+            if (NeedBoundRenderers)
+            {
+                cmdBuffer.SetComputeTextureParam(shallowWaterComputeShader, csMainKernel, "_ShallowBoundDepthTexture", BoundDepthRenderTexture);
+            }
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "CurrentBuffer", current);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "PrevBuffer", pre);
             cmdBuffer.SetComputeBufferParam(shallowWaterComputeShader, csMainKernel, "PrevPrevBuffer", prepre);
@@ -319,8 +343,6 @@ public class ShallowWater : MonoBehaviour
             cmdBuffer.EndSample("[ShallowWater]UpdateHeight");
             
             Graphics.ExecuteCommandBuffer(cmdBuffer);
-
-            WaterTarget.GetComponent<Renderer>().sharedMaterial.SetInt("_ShallowWaterSize", HeightMapSize);
         }
         Profiler.EndSample();
     }

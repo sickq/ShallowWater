@@ -3,6 +3,8 @@
 //发生在相机位置移动
 #pragma kernel UpdateBufferCS
 
+#pragma multi_compile_local __ ENABLE_SHALLOW_WATER_BOUND
+
 RWStructuredBuffer<float> PrevPrevBuffer;
 RWStructuredBuffer<float> PrevBuffer;
 RWStructuredBuffer<float> CurrentBuffer;
@@ -11,8 +13,10 @@ RWTexture2D<float> _ShallowWaterHeightRT;
 //移动物体的深度图，仅在移动的时候渲染
 Texture2D _ShallowObjDepthTexture;
 
+#if defined(ENABLE_SHALLOW_WATER_BOUND)
 //边界深度图，做水面边界交互使用
 Texture2D _ShallowBoundDepthTexture;
+#endif
 
 float4 _ShallowWaterParams1;
 
@@ -26,14 +30,15 @@ float GetPrevBufferValue(int indexX, int indexY, float fallbackValue)
     {
         return 0;
     }
-    // indexX = max(0, min(indexX, _ShallowWaterSize - 1));
-    // indexY = max(0, min(indexY, _ShallowWaterSize - 1));
+
+    #if defined(ENABLE_SHALLOW_WATER_BOUND)
     uint2 indexXY = uint2(indexX, indexY);
     float boundValue = _ShallowBoundDepthTexture[indexXY];
     if(boundValue != 0)
     {
         return fallbackValue;
     }
+    #endif
     
     int index = indexX + indexY * _ShallowWaterSize;
     return PrevBuffer[index];
