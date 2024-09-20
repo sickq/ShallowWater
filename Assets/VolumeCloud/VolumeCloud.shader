@@ -62,6 +62,20 @@ Shader "Hidden/VolumeCloud"
 
     uniform float4 _LightDir;
     uniform float4 _LightColor;
+    float4 _VolumeCloudParamsOffset;
+    float4 _VolumeDistanceParams;
+
+    float4 fragmentParamsVolumeBoundPivot;
+    float4 fragmentParamsVolumeBoundSize;
+
+    float4 fragmentParamsVolumeColorLerp;
+    float4 fragmentParamsVolumeLight;
+
+    float4 fragmentParamsColorFar;
+    float4 fragmentParamsColorNear;
+
+    float4 fragmentParamsRay;
+    float4 fragmentParamsNoise;
 
     sampler2D fragmentTextures0;
     sampler2D fragmentTextures1;
@@ -79,7 +93,6 @@ Shader "Hidden/VolumeCloud"
 
     float a;
     float alpha;
-    float3 camRay;
     float3 col;
     float3 col2;
     float3 col3;
@@ -102,12 +115,10 @@ Shader "Hidden/VolumeCloud"
     float distBlend;
     float ditherNoise;
     float3 f;
-    float4 far;
     float fogHeight;
     int i;
     int i2;
     float3 i3;
-    float isSky;
     float minDist;
     float noiseTime;
     int numSteps;
@@ -161,16 +172,9 @@ Shader "Hidden/VolumeCloud"
     float3 x8;
     float3 x9;
 
-    // float3 val1(float2 uv){
-    // 	screen = uvToScreen(uv);
-    // 	far = float4(screen, 0., 1.) * float4x4(fragmentGlobals[1], fragmentGlobals[2], fragmentGlobals[3], fragmentGlobals[4]);
-    // 	far.xyz /= far.w;
-    // 	return normalize((far.xyz - fragmentGlobals[0].xyz));
-    // }
-
     float4 val3(void)
     {
-        worldUV = v.xy / fragmentParams[1].xy;
+        worldUV = (v.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;
         return tex2D(fragmentTextures0, worldUV);
     }
 
@@ -179,12 +183,12 @@ Shader "Hidden/VolumeCloud"
         v = samplePt;
         curFow = val3();
         fogHeight = curFow.w;
-        d2 = (fragmentParams[2].z + fogHeight - v.z) * fragmentParams[5].z;
+        d2 = (fragmentParams[2].z + fogHeight - v.y) * fragmentParams[5].z;
         {
-            noiseTime = curTime * fragmentParams[11].y;
+            noiseTime = curTime * fragmentParamsNoise.y;
             tnoise = 0.;
             pt = v * nscale;
-            d2 += tnoise * fragmentParams[11].x;
+            d2 += tnoise * fragmentParamsNoise.x;
         }
         d2 *= fragmentParams[6].x;
         return d2;
@@ -192,7 +196,7 @@ Shader "Hidden/VolumeCloud"
 
     float4 val5(void)
     {
-        worldUV2 = v2.xy / fragmentParams[1].xy;
+        worldUV2 = (v2.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;;
         return tex2D(fragmentTextures0, worldUV2);
     }
 
@@ -286,17 +290,17 @@ Shader "Hidden/VolumeCloud"
         v2 = samplePt2;
         curFow = val5();
         fogHeight = curFow.w;
-        d2 = (0. + fogHeight - v2.z) * fragmentParams[5].z;
+        d2 = (0. + fogHeight - v2.y) * fragmentParams[5].z;
         {
-            noiseTime = curTime * fragmentParams[11].y;
+            noiseTime = curTime * fragmentParamsNoise.y;
             tnoise = 0.;
             pt = v2 * nscale;
             if (int(fragmentParams[4].w) >= 1) tnoise += val6() * 1.;
-            if (int(fragmentParams[4].w) >= 2) tnoise += val8() * 1. / fragmentParams[11].z;
-            if (int(fragmentParams[4].w) >= 3) tnoise += val10() * 1. / fragmentParams[11].w;
-            if (int(fragmentParams[4].w) >= 4) tnoise += val12() * 1. / fragmentParams[12].x;
-            if (int(fragmentParams[4].w) >= 5) tnoise += val14() * 1. / fragmentParams[12].y;
-            d2 += tnoise * fragmentParams[11].x;
+            if (int(fragmentParams[4].w) >= 2) tnoise += val8() * 1. / _VolumeCloudParamsOffset.x;
+            if (int(fragmentParams[4].w) >= 3) tnoise += val10() * 1. / _VolumeCloudParamsOffset.y;
+            if (int(fragmentParams[4].w) >= 4) tnoise += val12() * 1. / _VolumeCloudParamsOffset.z;
+            if (int(fragmentParams[4].w) >= 5) tnoise += val14() * 1. / _VolumeCloudParamsOffset.w;
+            d2 += tnoise * fragmentParamsNoise.x;
         }
         d2 *= fragmentParams[6].x;
         return d2;
@@ -304,7 +308,7 @@ Shader "Hidden/VolumeCloud"
 
     float val16(void)
     {
-        v3 = samplePt2.xy;
+        v3 = samplePt2.xz;
         return tex2D(fragmentTextures2, v3 / fragmentParams[1].xy).x;
     }
 
@@ -312,7 +316,7 @@ Shader "Hidden/VolumeCloud"
     {
         dist = curDist;
         dfactor = smoothstep(
-            0., 1., (dist - fragmentParams[1].w - fragmentParams[1].z) / (fragmentParams[0].w - fragmentParams[1].z));
+            0., 1., (dist - _VolumeDistanceParams.y - _VolumeDistanceParams.z) / (_VolumeDistanceParams.x - _VolumeDistanceParams.z));
         return dfactor * dfactor;
     }
 
@@ -321,17 +325,17 @@ Shader "Hidden/VolumeCloud"
         samplePt4 = samplePt3;
         terrainZ3 = terrainZ2;
         dblend2 = dblend;
-        sampleHeight = clamp((samplePt4.z - terrainZ3) / fragmentParams[5].w, 0., 1.);
+        sampleHeight = clamp((samplePt4.y - terrainZ3) / fragmentParamsVolumeColorLerp.x, 0., 1.);
         col2 = curFow.xyz;
-        col2 = lerp(col2 * fragmentParams[4].xyz, col2, clamp(sampleHeight, 0., 1.));
-        col2 *= fragmentParams[3].w;
-        col2 = lerp(col2, fragmentParams[0].xyz, dblend2);
+        col2 = lerp(col2 * fragmentParamsColorNear, col2, clamp(sampleHeight, 0., 1.));
+        col2 *= fragmentParamsColorNear.w;
+        col2 = lerp(col2, fragmentParamsColorFar, dblend2);
         return col2;
     }
 
     float4 val21(void)
     {
-        worldUV3 = v4.xy / fragmentParams[1].xy;
+        worldUV3 = (v4.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;;
         return tex2D(fragmentTextures0, worldUV3);
     }
 
@@ -425,9 +429,9 @@ Shader "Hidden/VolumeCloud"
         v4 = samplePt3 + lightStep;
         curFow = val21();
         fogHeight = curFow.w;
-        d2 = (0. + fogHeight - v4.z) * fragmentParams[5].z;
+        d2 = (0. + fogHeight - v4.y) * fragmentParams[5].z;
         {
-            noiseTime = curTime * fragmentParams[11].y;
+            noiseTime = curTime * fragmentParamsNoise.y;
             tnoise = 0.;
             pt = v4 * nscale;
             if (int(fragmentParams[5].x) >= 1) tnoise += val22() * 1.;
@@ -435,7 +439,7 @@ Shader "Hidden/VolumeCloud"
             if (int(fragmentParams[5].x) >= 3) tnoise += val26() * 1. / fragmentParams[11].w;
             if (int(fragmentParams[5].x) >= 4) tnoise += val28() * 1. / fragmentParams[12].x;
             if (int(fragmentParams[5].x) >= 5) tnoise += val30() * 1. / fragmentParams[12].y;
-            d2 += tnoise * fragmentParams[11].x;
+            d2 += tnoise * fragmentParamsNoise.x;
         }
         d2 *= fragmentParams[6].x;
         return d2;
@@ -449,7 +453,7 @@ Shader "Hidden/VolumeCloud"
         d4 = d3;
         col = val19();
         dirLight = max(0., d4 - val20());
-        col += clamp(dirLight * fragmentParams[3].xyz * fragmentParams[2].w, 0., 1.);
+        col += clamp(dirLight * _LightColor * fragmentParamsVolumeLight.x, 0., 1.);
         a = clamp(d4, 0., 1.);
         colBlend2 = float4(col.xyz * a, a);
         return colBlend2;
@@ -472,40 +476,38 @@ Shader "Hidden/VolumeCloud"
         }
         float4 worldPos = GetWorldPositionFromDepthValue(input.texcoord, linearDepth);
 
-        curTime = _Time.y * 5;
+        curTime = _Time.y;
         nscale = fragmentParams[10].w;
         nscale.z *= fragmentParams[8].x;
         {
             pixelColor = float4(tex2D(_MainTex, input.texcoord).xyz, 0.);
             pixelPos = worldPos;
-            // camRay = val1(input.texcoord);
-            camRay = GetRay(worldPos.xyz);
-            camRay = float3(camRay.x, camRay.z, camRay.y);
+            float3 camRay = GetRay(worldPos.xyz);
 
-            depthDist = min(fragmentParams[0].w + fragmentParams[1].w, length((pixelPos - _WorldSpaceCameraPos.xyz)));
+            depthDist = min(_VolumeDistanceParams.x + _VolumeDistanceParams.y, length((pixelPos - _WorldSpaceCameraPos.xyz)));
             ditherNoise = 0.;
             {
                 nuv = input.texcoord * fragmentParams[10].yz / fragmentParams[9].yz;
                 ditherNoise = tex2D(fragmentTextures5, nuv).x;
                 ditherNoise = frac(ditherNoise + float(int(fragmentParams[9].x)) * 0.61803398875);
             }
-            lightStep = -_LightDir.xyz * fragmentParams[5].y;
+            lightStep = -_LightDir.xyz * fragmentParamsRay.x;
             minDist = 100000000.;
             startD = -1.;
             {
-                d = ditherNoise * fragmentParams[2].y;
-                numSteps = int(depthDist / fragmentParams[2].y) + 1;
+                d = ditherNoise * fragmentParamsRay.y;
+                numSteps = int(depthDist / fragmentParamsRay.y) + 1;
                 UNITY_LOOP
                 for (i = 0; i < numSteps; i++)
                 {
                     samplePt = _WorldSpaceCameraPos.xyz + camRay * d;
                     dens = val2();
-                    if (dens > fragmentParams[6].y)
+                    if (dens > fragmentParamsRay.z)
                     {
-                        startD = max(0., d - fragmentParams[2].y);
+                        startD = max(0., d - fragmentParamsRay.y);
                         break;
-                    };
-                    d += fragmentParams[2].y;
+                    }
+                    d += fragmentParamsRay.y;
                 }
             }
             if (startD >= 0.)
@@ -519,7 +521,7 @@ Shader "Hidden/VolumeCloud"
                 {
                     samplePt2 = _WorldSpaceCameraPos + camRay * curDist;
                     d3 = val4();
-                    if (d3 > fragmentParams[6].y)
+                    if (d3 > fragmentParamsRay.z)
                     {
                         terrainZ = val16();
                         distBlend = val17();
@@ -529,7 +531,7 @@ Shader "Hidden/VolumeCloud"
                         alpha *= 1. - distBlend;
                         colorAcc += colBlend * (1. - colorAcc.w) * alpha * stepSize;
                         minDist = min(minDist, curDist);
-                    };
+                    }
                     if (colorAcc.w > 0.99) break;
                     curDist += stepSize;
                 }

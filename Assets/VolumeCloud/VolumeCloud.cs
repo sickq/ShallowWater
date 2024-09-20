@@ -4,12 +4,34 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+[ImageEffectAllowedInSceneView]
 public class VolumeCloud : MonoBehaviour
 {
+    public Transform VolumeTrans;
+    
     public Texture2D fragmentTexture0;
     public Texture2D fragmentTexture1;
     public Texture2D fragmentTexture2;
     public Texture2D fragmentTexture5;
+
+    [Range(0, 200)]
+    public float VolumeColorLerpHeight = 25;
+    
+    [Range(0, 50)] public float RayCameraLength = 8.0f;
+    [Range(0, 50)] public float RayLightLength = 8.0f;
+    [Range(0, 1)] public float RayEdgeStop = 0.06f;
+
+    [Range(0, 1)] public float NoiseWeight = 0.06f;
+    [Range(-2, 2)] public float NoiseSpeed = 0.4f;
+    
+    [ColorUsage(false, true)] public Color colorFar;
+    [ColorUsage(false, true)] public Color colorNear;
+    [Range(0, 2)] public float colorNearWeight = 1.0f;
+    [Range(0, 2)] public float lightColorIntensity = 0.66f;
+
+    public float DistanceFar = 600;
+    public float DistanceNear = 50;
+    public float DistanceBase = -2;
 
     public Shader VolumeCloudShader;
     
@@ -39,6 +61,8 @@ public class VolumeCloud : MonoBehaviour
         new Vector4(0.06f, 0.40f, 2.00f, 3.00f            ),
         new Vector4(4.00f, 7.00f, 1.00f, 1.00f            ),
     };
+
+    private static Vector4 VolumeCloudParamsOffset = new Vector4(2.0f, 3.0f, 4.0f, 7.0f);
     
     private CommandBuffer cmdBuffer;
 
@@ -76,6 +100,7 @@ public class VolumeCloud : MonoBehaviour
         }
         cmdBuffer.Clear();
         cmdBuffer.Release();
+        cmdBuffer = null;
         curCamera.depthTextureMode = DepthTextureMode.None;
     }
 
@@ -95,7 +120,17 @@ public class VolumeCloud : MonoBehaviour
         cmdBuffer.SetGlobalTexture("fragmentTextures2", fragmentTexture2);
         cmdBuffer.SetGlobalTexture("fragmentTextures5", fragmentTexture5);
         cmdBuffer.SetGlobalVector("_LightDir", mainLight.transform.forward);
-        cmdBuffer.SetGlobalVector("_LightColor", mainLight.color.linear);
+        cmdBuffer.SetGlobalVector("_LightColor", mainLight.color.linear * mainLight.intensity);
+        cmdBuffer.SetGlobalVector("_VolumeCloudParamsOffset", VolumeCloudParamsOffset);
+        cmdBuffer.SetGlobalVector("_VolumeDistanceParams", new Vector4(DistanceFar, DistanceNear, DistanceBase));
+        cmdBuffer.SetGlobalVector("fragmentParamsColorFar", new Vector4(colorFar.linear.r, colorFar.linear.g, colorFar.linear.b, 1));
+        cmdBuffer.SetGlobalVector("fragmentParamsColorNear", new Vector4(colorNear.linear.r, colorNear.linear.g, colorNear.linear.b, colorNearWeight));
+        cmdBuffer.SetGlobalVector("fragmentParamsRay", new Vector4(RayLightLength, RayCameraLength, RayEdgeStop));
+        cmdBuffer.SetGlobalVector("fragmentParamsNoise", new Vector4(NoiseWeight, NoiseSpeed));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeColorLerp", new Vector4(VolumeColorLerpHeight, 1));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeLight", new Vector4(lightColorIntensity, 1));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundPivot", (VolumeTrans.position - VolumeTrans.lossyScale / 2));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundSize", VolumeTrans.lossyScale);
         cmdBuffer.SetGlobalVectorArray("fragmentGlobals", fragmentGlobals);
         cmdBuffer.SetGlobalVectorArray("fragmentParams", fragmentParams);
         
