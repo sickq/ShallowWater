@@ -18,9 +18,17 @@ public class VolumeCloud : MonoBehaviour
     public float VolumeColorLerpHeight = 25;
     
     [Range(0, 50)] public float RayCameraLength = 8.0f;
+    [Header("云内部的步进Size，默认值2")]
+    [Range(0, 50)] public float RayCameraInCloudLength = 2.0f;
     [Range(0, 50)] public float RayLightLength = 8.0f;
+    
+    //超出边界，停止Marching
     [Range(0, 1)] public float RayEdgeStop = 0.06f;
 
+    [Range(0, 1024)] public float DitherNoiseUVScaleX = 256;
+    [Range(0, 1024)] public float DitherNoiseUVScaleY = 256;
+    [Range(0, 1000)] public int DitherNoiseOffset = 494;
+    
     [Range(0, 1)] public float NoiseWeight = 0.06f;
     [Range(-2, 2)] public float NoiseSpeed = 0.4f;
     
@@ -32,6 +40,15 @@ public class VolumeCloud : MonoBehaviour
     public float DistanceFar = 600;
     public float DistanceNear = 50;
     public float DistanceBase = -2;
+
+    [Header("体积云颜色与原有相机颜色的混合参数，影响最终混合")]
+    [Range(0, 5)] public float FinalColorBlendPow = 1.50f;
+    [Range(0, 5)] public float FinalColorBlendWeight = 1.10f;
+
+    [Header("体积云最终颜色的参数，一般不需要调")]
+    [Range(0, 5)] public float FinalColorPow = 1;
+    [Range(0, 5)] public float FinalColorRemapLeft = 0;
+    [Range(0, 5)] public float FinalColorRemapRight = 1;
 
     public Shader VolumeCloudShader;
     
@@ -125,9 +142,13 @@ public class VolumeCloud : MonoBehaviour
         cmdBuffer.SetGlobalVector("_VolumeDistanceParams", new Vector4(DistanceFar, DistanceNear, DistanceBase));
         cmdBuffer.SetGlobalVector("fragmentParamsColorFar", new Vector4(colorFar.linear.r, colorFar.linear.g, colorFar.linear.b, 1));
         cmdBuffer.SetGlobalVector("fragmentParamsColorNear", new Vector4(colorNear.linear.r, colorNear.linear.g, colorNear.linear.b, colorNearWeight));
-        cmdBuffer.SetGlobalVector("fragmentParamsRay", new Vector4(RayLightLength, RayCameraLength, RayEdgeStop));
+        cmdBuffer.SetGlobalVector("fragmentParamsRay", new Vector4(RayLightLength, RayCameraLength, RayEdgeStop, RayCameraInCloudLength));
         cmdBuffer.SetGlobalVector("fragmentParamsNoise", new Vector4(NoiseWeight, NoiseSpeed));
+        cmdBuffer.SetGlobalVector("fragmentParamsDitherNoise", new Vector4(DitherNoiseUVScaleX, DitherNoiseUVScaleY, DitherNoiseOffset));
+        cmdBuffer.SetGlobalVector("fragmentParamsRenderResolution", new Vector4(curCamera.pixelWidth, curCamera.pixelHeight));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeColorLerp", new Vector4(VolumeColorLerpHeight, 1));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalColorBlend", new Vector4(FinalColorBlendPow, FinalColorBlendWeight));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalColor", new Vector4(FinalColorPow, FinalColorRemapLeft, FinalColorRemapRight));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeLight", new Vector4(lightColorIntensity, 1));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundPivot", (VolumeTrans.position - VolumeTrans.lossyScale / 2));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundSize", VolumeTrans.lossyScale);

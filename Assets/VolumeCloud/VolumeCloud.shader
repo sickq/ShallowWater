@@ -69,6 +69,8 @@ Shader "Hidden/VolumeCloud"
     float4 fragmentParamsVolumeBoundSize;
 
     float4 fragmentParamsVolumeColorLerp;
+    float4 fragmentParamsVolumeFinalColorBlend;
+    float4 fragmentParamsVolumeFinalColor;
     float4 fragmentParamsVolumeLight;
 
     float4 fragmentParamsColorFar;
@@ -76,6 +78,9 @@ Shader "Hidden/VolumeCloud"
 
     float4 fragmentParamsRay;
     float4 fragmentParamsNoise;
+
+    float4 fragmentParamsDitherNoise;
+    float4 fragmentParamsRenderResolution;
 
     sampler2D fragmentTextures0;
     sampler2D fragmentTextures1;
@@ -100,7 +105,6 @@ Shader "Hidden/VolumeCloud"
     float4 colBlend2;
     float4 colorAcc;
     float curDist;
-    float d;
     float d2;
     float d3;
     float d4;
@@ -113,7 +117,6 @@ Shader "Hidden/VolumeCloud"
     float dirLight;
     float dist;
     float distBlend;
-    float ditherNoise;
     float3 f;
     float fogHeight;
     int i;
@@ -465,6 +468,11 @@ Shader "Hidden/VolumeCloud"
         return col3 * col3;
     }
 
+    float3 remap01(half3 x, half t1, half t2)
+    {
+        return (x - t1) / (t2 - t1);
+    }
+
     half4 frag(VaryingsDefault input) : SV_Target
     {
         float depth = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, input.texcoord);
@@ -478,77 +486,80 @@ Shader "Hidden/VolumeCloud"
 
         curTime = _Time.y;
         nscale = fragmentParams[10].w;
-        nscale.z *= fragmentParams[8].x;
-        {
-            pixelColor = float4(tex2D(_MainTex, input.texcoord).xyz, 0.);
-            pixelPos = worldPos;
-            float3 camRay = GetRay(worldPos.xyz);
+        nscale.y *= fragmentParams[8].x;
+        
+        float4 basePixelColor = float4(tex2D(_MainTex, input.texcoord).xyz, 0.);
+        float4 volumePixelColor = 0;
+        pixelPos = worldPos;
+        float3 camRay = GetRay(worldPos.xyz);
 
-            depthDist = min(_VolumeDistanceParams.x + _VolumeDistanceParams.y, length((pixelPos - _WorldSpaceCameraPos.xyz)));
-            ditherNoise = 0.;
+        depthDist = min(_VolumeDistanceParams.x + _VolumeDistanceParams.y, length((pixelPos - _WorldSpaceCameraPos.xyz)));
+        float ditherNoise = 0.0;
+        
+        nuv = input.texcoord * fragmentParamsRenderResolution.xy / fragmentParamsDitherNoise.xy;
+        ditherNoise = tex2D(fragmentTextures5, nuv).x;
+        ditherNoise = frac(ditherNoise + float(int(fragmentParamsDitherNoise.z)) * 0.61803398875);
+        
+        lightStep = -_LightDir.xyz * fragmentParamsRay.x;
+        minDist = 100000000.;
+
+        //RayMarching到接触体积云的位置
+        float startD = -1.0;
+        
+        float d = ditherNoise * fragmentParamsRay.y;
+        numSteps = int(depthDist / fragmentParamsRay.y) + 1;
+        UNITY_LOOP
+        for (i = 0; i < numSteps; i++)
+        {
+            samplePt = _WorldSpaceCameraPos.xyz + camRay * d;
+            dens = val2();
+            if (dens > fragmentParamsRay.z)
             {
-                nuv = input.texcoord * fragmentParams[10].yz / fragmentParams[9].yz;
-                ditherNoise = tex2D(fragmentTextures5, nuv).x;
-                ditherNoise = frac(ditherNoise + float(int(fragmentParams[9].x)) * 0.61803398875);
+                startD = max(0., d - fragmentParamsRay.y);
+                break;
             }
-            lightStep = -_LightDir.xyz * fragmentParamsRay.x;
-            minDist = 100000000.;
-            startD = -1.;
-            {
-                d = ditherNoise * fragmentParamsRay.y;
-                numSteps = int(depthDist / fragmentParamsRay.y) + 1;
-                UNITY_LOOP
-                for (i = 0; i < numSteps; i++)
-                {
-                    samplePt = _WorldSpaceCameraPos.xyz + camRay * d;
-                    dens = val2();
-                    if (dens > fragmentParamsRay.z)
-                    {
-                        startD = max(0., d - fragmentParamsRay.y);
-                        break;
-                    }
-                    d += fragmentParamsRay.y;
-                }
-            }
-            if (startD >= 0.)
-            {
-                colorAcc = 0.0;
-                stepSize = fragmentParams[2].x;
-                curDist = startD;
-                numSteps2 = int((depthDist - startD) / fragmentParams[2].x) + 1;
-                UNITY_LOOP
-                for (i2 = 0; i2 < numSteps2; i2++)
-                {
-                    samplePt2 = _WorldSpaceCameraPos + camRay * curDist;
-                    d3 = val4();
-                    if (d3 > fragmentParamsRay.z)
-                    {
-                        terrainZ = val16();
-                        distBlend = val17();
-                        colBlend = val18();
-                        alpha = 1.;
-                        alpha *= clamp(abs(depthDist - curDist) / fragmentParams[7].w, 0., 1.);
-                        alpha *= 1. - distBlend;
-                        colorAcc += colBlend * (1. - colorAcc.w) * alpha * stepSize;
-                        minDist = min(minDist, curDist);
-                    }
-                    if (colorAcc.w > 0.99) break;
-                    curDist += stepSize;
-                }
-                colorAcc.xyz /= (0.001 + colorAcc.w);
-                colorAcc.xyz = (colorAcc.xyz - fragmentParams[6].z) / (fragmentParams[6].w - fragmentParams[6].z);
-                colorAcc.xyz = pow(colorAcc.xyz, fragmentParams[7].x);
-                colorAcc.xyz = val32();
-                colorAcc.w = clamp(pow(colorAcc.w, fragmentParams[7].z) * fragmentParams[7].y, 0., 1.);
-                pixelColor = colorAcc;
-            };
-            outputDist = minDist;
+            d += fragmentParamsRay.y;
         }
+
+        //已经接触到体积云，计算颜色
+        if (startD >= 0.)
+        {
+            colorAcc = 0.0;
+            //云内部的步进距离
+            stepSize = fragmentParamsRay.w;
+            curDist = startD;
+            numSteps2 = int((depthDist - startD) / stepSize) + 1;
+            UNITY_LOOP
+            for (i2 = 0; i2 < numSteps2; i2++)
+            {
+                samplePt2 = _WorldSpaceCameraPos + camRay * curDist;
+                d3 = val4();
+                if (d3 > fragmentParamsRay.z)
+                {
+                    terrainZ = val16();
+                    distBlend = val17();
+                    colBlend = val18();
+                    alpha = 1.;
+                    alpha *= clamp(abs(depthDist - curDist) / fragmentParams[7].w, 0., 1.);
+                    alpha *= 1. - distBlend;
+                    colorAcc += colBlend * (1. - colorAcc.w) * alpha * stepSize;
+                    minDist = min(minDist, curDist);
+                }
+                if (colorAcc.w > 0.99) break;
+                curDist += stepSize;
+            }
+            colorAcc.xyz /= (0.001 + colorAcc.w);
+            colorAcc.xyz = remap01(colorAcc.xyz, fragmentParamsVolumeFinalColor.y, fragmentParamsVolumeFinalColor.z);
+            colorAcc.xyz = pow(colorAcc.xyz, fragmentParamsVolumeFinalColor.x);
+            colorAcc.xyz = val32();
+            colorAcc.w = clamp(pow(colorAcc.w, fragmentParamsVolumeFinalColorBlend.x) * fragmentParamsVolumeFinalColorBlend.y, 0., 1.);
+            volumePixelColor = colorAcc;
+        };
+        outputDist = minDist;
         // color = pixelColor;
         // OUTPUT1 = color;
         // OUTPUT2 = outputDist;
-
-        return pixelColor;
+        return lerp(basePixelColor, volumePixelColor, volumePixelColor.w);
     }
     ENDHLSL
 

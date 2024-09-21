@@ -38,7 +38,6 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -123,6 +122,68 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &164760032
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 164760035}
+  - component: {fileID: 164760034}
+  - component: {fileID: 164760033}
+  m_Layer: 0
+  m_Name: Cube
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!65 &164760033
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 164760032}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!33 &164760034
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 164760032}
+  m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &164760035
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 164760032}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1000, y: 0, z: 1000}
+  m_LocalScale: {x: 2000, y: 200, z: 2000}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1480211364
 GameObject:
   m_ObjectHideFlags: 0
@@ -154,10 +215,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b2da87526a07c6d4c883dc3e62775e82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  VolumeTrans: {fileID: 164760035}
   fragmentTexture0: {fileID: 2800000, guid: 8b8f8fc7859e0614aaeee598ca7e3d16, type: 2}
   fragmentTexture1: {fileID: 2800000, guid: 4b06071b827531548982d0bf52a3810f, type: 3}
   fragmentTexture2: {fileID: 2800000, guid: 5174da4818fbb714a86e2b8eb9d79b2b, type: 2}
   fragmentTexture5: {fileID: 2800000, guid: 5ca0eb4743d9cf044bb058fc689507f1, type: 3}
+  VolumeColorLerpHeight: 25
+  RayCameraLength: 8
+  RayCameraInCloudLength: 2
+  RayLightLength: 8
+  RayEdgeStop: 0.06
+  DitherNoiseUVScaleX: 256
+  DitherNoiseUVScaleY: 256
+  DitherNoiseOffset: 494
+  NoiseWeight: 0.06
+  NoiseSpeed: 0.4
+  colorFar: {r: 0, g: 0, b: 0, a: 0}
+  colorNear: {r: 0, g: 0, b: 0, a: 0}
+  colorNearWeight: 1
+  lightColorIntensity: 0.66
+  DistanceFar: 600
+  DistanceNear: 50
+  DistanceBase: -2
+  FinalColorBlendPow: 1.5
+  FinalColorBlendWeight: 1.1
+  FinalColorPow: 1
+  FinalColorRemapLeft: 0
+  FinalColorRemapRight: 1
   VolumeCloudShader: {fileID: 4800000, guid: 974e5460d7f728b4183f6d064606f68b, type: 3}
 --- !u!81 &1480211366
 AudioListener:
@@ -227,7 +311,7 @@ Transform:
   m_GameObject: {fileID: 1480211364}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 601, y: 1646, z: 73}
+  m_LocalPosition: {x: 601, y: 73, z: 1646}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -333,3 +417,4 @@ SceneRoots:
   m_Roots:
   - {fileID: 1480211368}
   - {fileID: 1652841083}
+  - {fileID: 164760035}
