@@ -29,8 +29,12 @@ public class VolumeCloud : MonoBehaviour
     [Range(0, 1024)] public float DitherNoiseUVScaleY = 256;
     [Range(0, 1000)] public int DitherNoiseOffset = 494;
     
-    [Range(0, 1)] public float NoiseWeight = 0.06f;
-    [Range(-2, 2)] public float NoiseSpeed = 0.4f;
+    [Range(-1, 1)] public float NoiseWeight = 0.06f;
+    [Range(-5, 5)] public float NoiseSpeed = 0.4f;
+    [Range(0, 1)] public float NoiseScale = 0.0773f;
+    [Range(0, 2)] public float NoiseScaleY = 1.0f;
+
+    [Range(0, 2)] public float VolumeShapeWeight = 0.4995f;
     
     [ColorUsage(false, true)] public Color colorFar;
     [ColorUsage(false, true)] public Color colorNear;
@@ -41,6 +45,7 @@ public class VolumeCloud : MonoBehaviour
     public float DistanceNear = 50;
     public float DistanceBase = -2;
 
+    
     [Header("体积云颜色与原有相机颜色的混合参数，影响最终混合")]
     [Range(0, 5)] public float FinalColorBlendPow = 1.50f;
     [Range(0, 5)] public float FinalColorBlendWeight = 1.10f;
@@ -49,6 +54,9 @@ public class VolumeCloud : MonoBehaviour
     [Range(0, 5)] public float FinalColorPow = 1;
     [Range(0, 5)] public float FinalColorRemapLeft = 0;
     [Range(0, 5)] public float FinalColorRemapRight = 1;
+    
+    [Range(0, 5)] public float FinalAlphaDistance = 2.0f;
+
 
     public Shader VolumeCloudShader;
     
@@ -64,19 +72,19 @@ public class VolumeCloud : MonoBehaviour
     
     private static readonly Vector4[] fragmentParams =
     {
-        new Vector4(0.89906f, 0.74114f, 0.48176f, 698.00f ),
-        new Vector4( 2000.00f, 2000.00f, -2.00f, 71.40f    ),
-        new Vector4( 2.00f, 8.00f, 5.00f, 0.66f            ),
-        new Vector4( 0.81176f, 0.70588f, 0.59608f, 1.00f   ),
-        new Vector4( 0.67059f, 0.48235f, 0.36471f, 4.00f   ),
-        new Vector4( 2.00f, 8.00f, 0.02f, 25.00f           ),
-        new Vector4(0.4995f, 0.06f, 0.00f, 1.00f          ),
-        new Vector4(1.00f, 1.10f, 1.50f, 2.00f            ),
-        new Vector4(1.00f, -0.37279f, -0.73165f, -0.57071f),
-        new Vector4(494.00f, 256.00f, 256.00f, 1.30f      ),
-        new Vector4(35.4924f, 1280.00f, 721.00f, 0.0773f  ),
-        new Vector4(0.06f, 0.40f, 2.00f, 3.00f            ),
-        new Vector4(4.00f, 7.00f, 1.00f, 1.00f            ),
+        new Vector4(0.89906f, 0.74114f, 0.48176f, 698.00f ),        //0
+        new Vector4( 2000.00f, 2000.00f, -2.00f, 71.40f    ),       //1
+        new Vector4( 2.00f, 8.00f, 5.00f, 0.66f            ),       //2
+        new Vector4( 0.81176f, 0.70588f, 0.59608f, 1.00f   ),       //3
+        new Vector4( 0.67059f, 0.48235f, 0.36471f, 4.00f   ),       //4
+        new Vector4( 2.00f, 8.00f, 0.02f, 25.00f           ),       //5
+        new Vector4(0.4995f, 0.06f, 0.00f, 1.00f          ),        //6
+        new Vector4(1.00f, 1.10f, 1.50f, 2.00f            ),        //7
+        new Vector4(1.00f, -0.37279f, -0.73165f, -0.57071f),        //8
+        new Vector4(494.00f, 256.00f, 256.00f, 1.30f      ),        //9
+        new Vector4(35.4924f, 1280.00f, 721.00f, 0.0773f  ),        //10
+        new Vector4(0.06f, 0.40f, 2.00f, 3.00f            ),        //11
+        new Vector4(4.00f, 7.00f, 1.00f, 1.00f            ),        //12
     };
 
     private static Vector4 VolumeCloudParamsOffset = new Vector4(2.0f, 3.0f, 4.0f, 7.0f);
@@ -140,19 +148,21 @@ public class VolumeCloud : MonoBehaviour
         cmdBuffer.SetGlobalVector("_LightColor", mainLight.color.linear * mainLight.intensity);
         cmdBuffer.SetGlobalVector("_VolumeCloudParamsOffset", VolumeCloudParamsOffset);
         cmdBuffer.SetGlobalVector("_VolumeDistanceParams", new Vector4(DistanceFar, DistanceNear, DistanceBase));
-        cmdBuffer.SetGlobalVector("fragmentParamsColorFar", new Vector4(colorFar.linear.r, colorFar.linear.g, colorFar.linear.b, 1));
-        cmdBuffer.SetGlobalVector("fragmentParamsColorNear", new Vector4(colorNear.linear.r, colorNear.linear.g, colorNear.linear.b, colorNearWeight));
+        cmdBuffer.SetGlobalVector("fragmentParamsColorFar", new Vector4(colorFar.r, colorFar.g, colorFar.b, 1));
+        cmdBuffer.SetGlobalVector("fragmentParamsColorNear", new Vector4(colorNear.r, colorNear.g, colorNear.b, colorNearWeight));
         cmdBuffer.SetGlobalVector("fragmentParamsRay", new Vector4(RayLightLength, RayCameraLength, RayEdgeStop, RayCameraInCloudLength));
-        cmdBuffer.SetGlobalVector("fragmentParamsNoise", new Vector4(NoiseWeight, NoiseSpeed));
+        cmdBuffer.SetGlobalVector("fragmentParamsNoise", new Vector4(NoiseWeight, NoiseSpeed, NoiseScale, NoiseScaleY));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeShape", new Vector4(VolumeShapeWeight, 0));
         cmdBuffer.SetGlobalVector("fragmentParamsDitherNoise", new Vector4(DitherNoiseUVScaleX, DitherNoiseUVScaleY, DitherNoiseOffset));
         cmdBuffer.SetGlobalVector("fragmentParamsRenderResolution", new Vector4(curCamera.pixelWidth, curCamera.pixelHeight));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeColorLerp", new Vector4(VolumeColorLerpHeight, 1));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalColorBlend", new Vector4(FinalColorBlendPow, FinalColorBlendWeight));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalColor", new Vector4(FinalColorPow, FinalColorRemapLeft, FinalColorRemapRight));
+        cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalAlpha", new Vector4(FinalAlphaDistance, 1));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeLight", new Vector4(lightColorIntensity, 1));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundPivot", (VolumeTrans.position - VolumeTrans.lossyScale / 2));
         cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundSize", VolumeTrans.lossyScale);
-        cmdBuffer.SetGlobalVectorArray("fragmentGlobals", fragmentGlobals);
+
         cmdBuffer.SetGlobalVectorArray("fragmentParams", fragmentParams);
         
         cmdBuffer.GetTemporaryRT(_VolumeTempRT, curCamera.pixelWidth, curCamera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);

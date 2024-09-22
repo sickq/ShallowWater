@@ -230,13 +230,17 @@ MonoBehaviour:
   DitherNoiseOffset: 494
   NoiseWeight: 0.06
   NoiseSpeed: 0.4
-  colorFar: {r: 0, g: 0, b: 0, a: 0}
-  colorNear: {r: 0, g: 0, b: 0, a: 0}
+  NoiseScale: 0.0773
+  NoiseScaleY: 1
+  VolumeShapeWeight: 0.4995
+  colorFar: {r: 0.89906, g: 0.74114, b: 0.48176, a: 0}
+  colorNear: {r: 0.67059, g: 0.48235, b: 0.36471, a: 0}
   colorNearWeight: 1
   lightColorIntensity: 0.66
   DistanceFar: 600
   DistanceNear: 50
   DistanceBase: -2
+  FinalAlphaTemp: 2
   FinalColorBlendPow: 1.5
   FinalColorBlendWeight: 1.1
   FinalColorPow: 1

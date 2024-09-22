@@ -68,9 +68,12 @@ Shader "Hidden/VolumeCloud"
     float4 fragmentParamsVolumeBoundPivot;
     float4 fragmentParamsVolumeBoundSize;
 
+    float4 fragmentParamsVolumeShape;
+    
     float4 fragmentParamsVolumeColorLerp;
     float4 fragmentParamsVolumeFinalColorBlend;
     float4 fragmentParamsVolumeFinalColor;
+    float4 fragmentParamsVolumeFinalAlpha;
     float4 fragmentParamsVolumeLight;
 
     float4 fragmentParamsColorFar;
@@ -87,398 +90,140 @@ Shader "Hidden/VolumeCloud"
     sampler2D fragmentTextures2;
     sampler2D fragmentTextures5;
 
-    float2 uvToScreen(float2 v) { return v * float2(2., -2.) + float2(-1., 1.); }
-    float4 color;
-    float4 pixelColor;
-    float curTime;
-    float3 nscale;
-    float4 outputDist;
-    float3 lightStep;
-    float4 curFow;
 
-    float a;
-    float alpha;
-    float3 col;
-    float3 col2;
-    float3 col3;
-    float4 colBlend;
-    float4 colBlend2;
-    float4 colorAcc;
-    float curDist;
-    float d2;
-    float d3;
-    float d4;
-    float dblend;
-    float dblend2;
-    float dens;
-    float depth;
-    float depthDist;
-    float dfactor;
-    float dirLight;
-    float dist;
-    float distBlend;
-    float3 f;
-    float fogHeight;
-    int i;
-    int i2;
-    float3 i3;
-    float minDist;
-    float noiseTime;
-    int numSteps;
-    int numSteps2;
-    float2 nuv;
-    float3 originWS;
-    float3 p;
-    float3 p10;
-    float3 p2;
-    float3 p3;
-    float3 p4;
-    float3 p5;
-    float3 p6;
-    float3 p7;
-    float3 p8;
-    float3 p9;
-    float3 pixelPos;
-    float3 pt;
-    float2 rg;
-    float sampleHeight;
-    float3 samplePt;
-    float3 samplePt2;
-    float3 samplePt3;
-    float3 samplePt4;
-    float2 screen;
-    float startD;
-    float stepSize;
-    float4 temp;
-    float terrainZ;
-    float terrainZ2;
-    float terrainZ3;
-    float tnoise;
-    float2 uv_2;
-    float2 uv2;
-    float2 uv3;
-    float3 v;
-    float3 v2;
-    float2 v3;
-    float3 v4;
-    float2 worldUV;
-    float2 worldUV2;
-    float2 worldUV3;
-    float3 x;
-    float3 x10;
-    float3 x2;
-    float3 x3;
-    float3 x4;
-    float3 x5;
-    float3 x6;
-    float3 x7;
-    float3 x8;
-    float3 x9;
-
-    float4 val3(void)
+    static const int KernelSize = 5;
+    static const float3 NoiseKernel[KernelSize] =
     {
-        worldUV = (v.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;
+        float3(0., -1., 0.0),
+        float3(-0.9, -1.1, 0.),
+        float3(0.8, -1.2, 0.95),
+        float3(0., -1.3, -0.84),
+        float3(0., 1.5, 0.),
+    };
+
+    static const int NoiseOffset[KernelSize] =
+    {
+        1,
+        2,
+        4,
+        8,
+        12,
+    };
+
+    #define MinDist 100000000.0
+
+
+    float4 sampleFow(float3 targetPoint)
+    {
+        float2 worldUV = (targetPoint.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;
         return tex2D(fragmentTextures0, worldUV);
     }
 
-    float val2(void)
+    float val2(float3 targetPoint, float3 noiseScale, float time)
     {
-        v = samplePt;
-        curFow = val3();
-        fogHeight = curFow.w;
-        d2 = (fragmentParams[2].z + fogHeight - v.y) * fragmentParams[5].z;
-        {
-            noiseTime = curTime * fragmentParamsNoise.y;
-            tnoise = 0.;
-            pt = v * nscale;
-            d2 += tnoise * fragmentParamsNoise.x;
-        }
+        float4 curFow = sampleFow(targetPoint);
+        float fogHeight = curFow.w;
+        float d2 = (fragmentParams[2].z + fogHeight - targetPoint.y) * fragmentParams[5].z;
+        
+        float noiseTime = time * fragmentParamsNoise.y;
+        float tnoise = 0.;
+        float pt = targetPoint * noiseScale;
+        d2 += tnoise * fragmentParamsNoise.x;
+        
         d2 *= fragmentParams[6].x;
         return d2;
     }
 
-    float4 val5(void)
+    float sampleNoise(float3 targetPoint)
     {
-        worldUV2 = (v2.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;
-        return tex2D(fragmentTextures0, worldUV2);
+        float3 targetPointInt = floor(targetPoint);
+        float3 targetPointDecimal = frac(targetPoint);
+        targetPointDecimal = targetPointDecimal * targetPointDecimal * (3. - 2. * targetPointDecimal);
+
+        float2 noiseUV = (targetPointInt.xz + float2(37., 239.) * targetPointInt.y) + targetPointDecimal.xz;
+        float2 noiseRG = tex2D(fragmentTextures1, (noiseUV + 0.5) / 256.).yx;
+        return lerp(noiseRG.x, noiseRG.y, targetPointDecimal.y);
     }
 
-    float val7(void)
+    float sampleNoiseOffset(float3 tempPoint, int offset, float noiseTime)
     {
-        x = p;
-        i3 = floor(x);
-        f = frac(x);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
+        float3 targetPoint = tempPoint * NoiseOffset[offset] + NoiseKernel[offset] * noiseTime;
+        return sampleNoise(targetPoint) * 2. - 1.;
     }
-
-    float val6(void)
+    
+    float VolumeCloudNoise(float3 targetPoint, float4 fowData, float3 noiseScale, float time)
     {
-        p = pt + float3(0., -1., 0.0) * noiseTime;
-        return val7() * 2. - 1.;
-    }
+        float fogHeight = fowData.w;
+        float d2 = (0. + fogHeight - targetPoint.y) * fragmentParams[5].z;
+        
+        float noiseTime = time * fragmentParamsNoise.y;
+        float tnoise = 0.;
+        float3 scalePoint = targetPoint * noiseScale;
+        if (int(fragmentParams[4].w) >= 1) tnoise += sampleNoiseOffset(scalePoint, 0, noiseTime);
+        if (int(fragmentParams[4].w) >= 2) tnoise += sampleNoiseOffset(scalePoint, 1, noiseTime) * 1. / _VolumeCloudParamsOffset.x;
+        if (int(fragmentParams[4].w) >= 3) tnoise += sampleNoiseOffset(scalePoint, 2, noiseTime) * 1. / _VolumeCloudParamsOffset.y;
+        if (int(fragmentParams[4].w) >= 4) tnoise += sampleNoiseOffset(scalePoint, 3, noiseTime) * 1. / _VolumeCloudParamsOffset.z;
+        if (int(fragmentParams[4].w) >= 5) tnoise += sampleNoiseOffset(scalePoint, 4, noiseTime) * 1. / _VolumeCloudParamsOffset.w;
 
-    float val9(void)
-    {
-        x2 = p2;
-        i3 = floor(x2);
-        f = frac(x2);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val8(void)
-    {
-        p2 = pt * 2. + float3(-0.9, -1.1, 0.) * noiseTime;
-        return val9() * 2. - 1.;
-    }
-
-    float val11(void)
-    {
-        x3 = p3;
-        i3 = floor(x3);
-        f = frac(x3);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val10(void)
-    {
-        p3 = pt * 4. + float3(0.8, -1.2, 0.95) * noiseTime;
-        return val11() * 2. - 1.;
-    }
-
-    float val13(void)
-    {
-        x4 = p4;
-        i3 = floor(x4);
-        f = frac(x4);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val12(void)
-    {
-        p4 = pt * 8. + float3(0., -1.3, -0.84) * noiseTime;
-        return val13() * 2. - 1.;
-    }
-
-    float val15(void)
-    {
-        x5 = p5;
-        i3 = floor(x5);
-        f = frac(x5);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val14(void)
-    {
-        p5 = pt * 12. + float3(0., 1.5, 0.) * noiseTime;
-        return val15() * 2. - 1.;
-    }
-
-    float val4(void)
-    {
-        v2 = samplePt2;
-        curFow = val5();
-        fogHeight = curFow.w;
-        d2 = (0. + fogHeight - v2.y) * fragmentParams[5].z;
-        {
-            noiseTime = curTime * fragmentParamsNoise.y;
-            tnoise = 0.;
-            pt = v2 * nscale;
-            if (int(fragmentParams[4].w) >= 1) tnoise += val6() * 1.;
-            if (int(fragmentParams[4].w) >= 2) tnoise += val8() * 1. / _VolumeCloudParamsOffset.x;
-            if (int(fragmentParams[4].w) >= 3) tnoise += val10() * 1. / _VolumeCloudParamsOffset.y;
-            if (int(fragmentParams[4].w) >= 4) tnoise += val12() * 1. / _VolumeCloudParamsOffset.z;
-            if (int(fragmentParams[4].w) >= 5) tnoise += val14() * 1. / _VolumeCloudParamsOffset.w;
-            d2 += tnoise * fragmentParamsNoise.x;
-        }
-        d2 *= fragmentParams[6].x;
+        d2 += tnoise * fragmentParamsNoise.x;
+        d2 *= fragmentParamsVolumeShape.x;
         return d2;
     }
 
-    float val16(void)
+    float sampleTerrainY(float3 targetPoint)
     {
-        v3 = samplePt2.xz;
-        return tex2D(fragmentTextures2, v3 / fragmentParams[1].xy).x;
+        return tex2D(fragmentTextures2, targetPoint.xz / fragmentParamsVolumeBoundSize.xz).x;
     }
 
-    float val17(void)
+    float CalculateDistFactor(float dist)
     {
-        dist = curDist;
-        dfactor = smoothstep(
-            0., 1., (dist - _VolumeDistanceParams.y - _VolumeDistanceParams.z) / (_VolumeDistanceParams.x - _VolumeDistanceParams.z));
+        float dfactor = smoothstep(0., 1., (dist - _VolumeDistanceParams.y - _VolumeDistanceParams.z) / (_VolumeDistanceParams.x - _VolumeDistanceParams.z));
         return dfactor * dfactor;
     }
 
-    float3 val19(void)
+    float3 calculateVolumeFogColor(float3 targetPoint, float terrainY, float distBlend, float3 fowColor)
     {
-        samplePt4 = samplePt3;
-        terrainZ3 = terrainZ2;
-        dblend2 = dblend;
-        sampleHeight = clamp((samplePt4.y - terrainZ3) / fragmentParams[5].w, 0., 1.);
-        col2 = curFow.xyz;
-        col2 = lerp(col2 * fragmentParams[4].xyz, col2, clamp(sampleHeight, 0., 1.));
-        col2 *= fragmentParams[3].w;
-        col2 = lerp(col2, fragmentParams[0].xyz, dblend2);
+        float sampleHeight = clamp((targetPoint.y - terrainY) / fragmentParamsVolumeColorLerp.x, 0., 1.);
+        float3 col2 = fowColor.xyz;
+        col2 = lerp(col2 * fragmentParamsColorNear, col2, clamp(sampleHeight, 0., 1.));
+        col2 *= fragmentParamsColorNear.w;
+        col2 = lerp(col2, fragmentParamsColorFar, distBlend);
         return col2;
     }
 
-    // float3 val19(void)
-    // {
-    //     samplePt4 = samplePt3;
-    //     terrainZ3 = terrainZ2;
-    //     dblend2 = dblend;
-    //     sampleHeight = clamp((samplePt4.y - terrainZ3) / fragmentParamsVolumeColorLerp.x, 0., 1.);
-    //     col2 = curFow.xyz;
-    //     col2 = lerp(col2 * fragmentParamsColorNear, col2, clamp(sampleHeight, 0., 1.));
-    //     col2 *= fragmentParamsColorNear.w;
-    //     col2 = lerp(col2, fragmentParamsColorFar, dblend2);
-    //     return col2;
-    // }
-
-    float4 val21(void)
+    float sampleLightNoise(float3 targetPoint, float3 lightStep, float3 noiseScale, float time)
     {
-        worldUV3 = (v4.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;;
-        return tex2D(fragmentTextures0, worldUV3);
-    }
-
-    float val23(void)
-    {
-        x6 = p6;
-        i3 = floor(x6);
-        f = frac(x6);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val22(void)
-    {
-        p6 = pt + float3(0., -1., 0.0) * noiseTime;
-        return val23() * 2. - 1.;
-    }
-
-    float val25(void)
-    {
-        x7 = p7;
-        i3 = floor(x7);
-        f = frac(x7);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val24(void)
-    {
-        p7 = pt * 2. + float3(-0.9, -1.1, 0.) * noiseTime;
-        return val25() * 2. - 1.;
-    }
-
-    float val27(void)
-    {
-        x8 = p8;
-        i3 = floor(x8);
-        f = frac(x8);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val26(void)
-    {
-        p8 = pt * 4. + float3(0.8, -1.2, 0.95) * noiseTime;
-        return val27() * 2. - 1.;
-    }
-
-    float val29(void)
-    {
-        x9 = p9;
-        i3 = floor(x9);
-        f = frac(x9);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val28(void)
-    {
-        p9 = pt * 8. + float3(0., -1.3, -0.84) * noiseTime;
-        return val29() * 2. - 1.;
-    }
-
-    float val31(void)
-    {
-        x10 = p10;
-        i3 = floor(x10);
-        f = frac(x10);
-        f = f * f * (3. - 2. * f);
-        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
-        rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.y);
-    }
-
-    float val30(void)
-    {
-        p10 = pt * 12. + float3(0., 1.5, 0.0) * noiseTime;
-        return val31() * 2. - 1.;
-    }
-
-    float val20(void)
-    {
-        v4 = samplePt3 + lightStep;
-        curFow = val21();
-        fogHeight = curFow.w;
-        d2 = (0. + fogHeight - v4.y) * fragmentParams[5].z;
-        {
-            noiseTime = curTime * fragmentParamsNoise.y;
-            tnoise = 0.;
-            pt = v4 * nscale;
-            if (int(fragmentParams[5].x) >= 1) tnoise += val22() * 1.;
-            if (int(fragmentParams[5].x) >= 2) tnoise += val24() * 1. / fragmentParams[11].z;
-            if (int(fragmentParams[5].x) >= 3) tnoise += val26() * 1. / fragmentParams[11].w;
-            if (int(fragmentParams[5].x) >= 4) tnoise += val28() * 1. / fragmentParams[12].x;
-            if (int(fragmentParams[5].x) >= 5) tnoise += val30() * 1. / fragmentParams[12].y;
-            d2 += tnoise * fragmentParamsNoise.x;
-        }
-        d2 *= fragmentParams[6].x;
+        targetPoint = targetPoint + lightStep;
+        float4 curFow = sampleFow(targetPoint);
+        float fogHeight = curFow.w;
+        float d2 = (0. + fogHeight - targetPoint.y) * fragmentParams[5].z;
+        float noiseTime = time * fragmentParamsNoise.y;
+        float tnoise = 0.;
+        float3 scalePoint = targetPoint * noiseScale;
+        if (int(fragmentParams[5].w) >= 1) tnoise += sampleNoiseOffset(scalePoint, 0, noiseTime);
+        if (int(fragmentParams[5].w) >= 2) tnoise += sampleNoiseOffset(scalePoint, 1, noiseTime) * 1. / _VolumeCloudParamsOffset.x;
+        if (int(fragmentParams[5].w) >= 3) tnoise += sampleNoiseOffset(scalePoint, 2, noiseTime) * 1. / _VolumeCloudParamsOffset.y;
+        if (int(fragmentParams[5].w) >= 4) tnoise += sampleNoiseOffset(scalePoint, 3, noiseTime) * 1. / _VolumeCloudParamsOffset.z;
+        if (int(fragmentParams[5].w) >= 5) tnoise += sampleNoiseOffset(scalePoint, 4, noiseTime) * 1. / _VolumeCloudParamsOffset.w;
+        
+        d2 += tnoise * fragmentParamsNoise.x;
+        d2 *= fragmentParamsVolumeShape.x;
         return d2;
     }
 
-    float4 val18(void)
+    float4 calculateColorBlend(float3 targetPoint, float terrainY, float distBlend, float volumeShape, float3 fowColor, float time, float3 lightStep, float3 noiseScale)
     {
-        samplePt3 = samplePt2;
-        terrainZ2 = terrainZ;
-        dblend = distBlend;
-        d4 = d3;
-        col = val19();
-        dirLight = max(0., d4 - val20());
-        col += clamp(dirLight * _LightColor * fragmentParamsVolumeLight.x, 0., 1.);
-        a = clamp(d4, 0., 1.);
-        colBlend2 = float4(col.xyz * a, a);
-        return colBlend2;
+        float3 color = calculateVolumeFogColor(targetPoint, terrainY, distBlend, fowColor);
+        float dirLight = max(0., volumeShape - sampleLightNoise(targetPoint, lightStep, noiseScale, time));
+        color += clamp(dirLight * _LightColor * fragmentParamsVolumeLight.x, 0., 1.);
+        float a = clamp(volumeShape, 0., 1.);
+        float4 colBlend = float4(color.xyz * a, a);
+        return colBlend;
     }
 
-    float3 val32(void)
+    float3 GammaToLinearSimple(float3 sRGB)
     {
-        col3 = colorAcc.xyz;
-        return col3 * col3;
+        return sRGB * sRGB;
     }
 
     float3 remap01(half3 x, half t1, half t2)
@@ -497,35 +242,33 @@ Shader "Hidden/VolumeCloud"
         }
         float4 worldPos = GetWorldPositionFromDepthValue(input.texcoord, linearDepth);
 
-        curTime = _Time.y;
-        nscale = fragmentParams[10].w;
-        nscale.y *= fragmentParams[8].x;
+        float curTime = _Time.y;
+        float3 noiseScale = fragmentParamsNoise.z;
+        noiseScale.y *= fragmentParamsNoise.w;
         
         float4 basePixelColor = float4(tex2D(_MainTex, input.texcoord).xyz, 0.);
         float4 volumePixelColor = 0;
-        pixelPos = worldPos;
         float3 camRay = GetRay(worldPos.xyz);
 
-        depthDist = min(_VolumeDistanceParams.x + _VolumeDistanceParams.y, length((pixelPos - _WorldSpaceCameraPos.xyz)));
-        float ditherNoise = 0.0;
+        float depthDist = min(_VolumeDistanceParams.x + _VolumeDistanceParams.y, length((worldPos - _WorldSpaceCameraPos.xyz)));
         
-        nuv = input.texcoord * fragmentParamsRenderResolution.xy / fragmentParamsDitherNoise.xy;
-        ditherNoise = tex2D(fragmentTextures5, nuv).x;
+        float2 nuv = input.texcoord * fragmentParamsRenderResolution.xy / fragmentParamsDitherNoise.xy;
+        float ditherNoise = tex2D(fragmentTextures5, nuv).x;
         ditherNoise = frac(ditherNoise + float(int(fragmentParamsDitherNoise.z)) * 0.61803398875);
         
-        lightStep = -_LightDir.xyz * fragmentParamsRay.x;
-        minDist = 100000000.;
+        float3 lightStep = -_LightDir.xyz * fragmentParamsRay.x;
+        float minDist = MinDist;
 
         //RayMarching到接触体积云的位置
         float startD = -1.0;
         
         float d = ditherNoise * fragmentParamsRay.y;
-        numSteps = int(depthDist / fragmentParamsRay.y) + 1;
+        int numSteps = int(depthDist / fragmentParamsRay.y) + 1;
         UNITY_LOOP
-        for (i = 0; i < numSteps; i++)
+        for (int i = 0; i < numSteps; i++)
         {
-            samplePt = _WorldSpaceCameraPos.xyz + camRay * d;
-            dens = val2();
+            float3 samplePt = _WorldSpaceCameraPos.xyz + camRay * d;
+            float dens = val2(samplePt, noiseScale, curTime);
             if (dens > fragmentParamsRay.z)
             {
                 startD = max(0., d - fragmentParamsRay.y);
@@ -537,41 +280,41 @@ Shader "Hidden/VolumeCloud"
         //已经接触到体积云，计算颜色
         if (startD >= 0.)
         {
-            colorAcc = 0.0;
+            float4 colorAcc = 0.0;
+            float alpha = 0.0;
             //云内部的步进距离
-            stepSize = fragmentParamsRay.w;
-            curDist = startD;
-            numSteps2 = int((depthDist - startD) / stepSize) + 1;
+            float stepSizeInVolume = fragmentParamsRay.w;
+            float curDist = startD;
+            numSteps = int((depthDist - startD) / stepSizeInVolume) + 1;
             UNITY_LOOP
-            for (i2 = 0; i2 < numSteps2; i2++)
+            for (int i2 = 0; i2 < numSteps; i2++)
             {
-                samplePt2 = _WorldSpaceCameraPos + camRay * curDist;
-                d3 = val4();
+                float3 samplePt2 = _WorldSpaceCameraPos + camRay * curDist;
+                float4 curFow = sampleFow(samplePt2);
+                float d3 = VolumeCloudNoise(samplePt2, curFow, noiseScale, curTime);
                 if (d3 > fragmentParamsRay.z)
                 {
-                    terrainZ = val16();
-                    distBlend = val17();
-                    colBlend = val18();
+                    float terrainY = sampleTerrainY(samplePt2);
+                    float distBlend = CalculateDistFactor(curDist);
+                    float4 colBlend = calculateColorBlend(samplePt2, terrainY, distBlend, d3, curFow.xyz, curTime, lightStep, noiseScale);
                     alpha = 1.;
-                    alpha *= clamp(abs(depthDist - curDist) / fragmentParams[7].w, 0., 1.);
+                    alpha *= clamp(abs(depthDist - curDist) / fragmentParamsVolumeFinalAlpha.x, 0., 1.);
                     alpha *= 1. - distBlend;
-                    colorAcc += colBlend * (1. - colorAcc.w) * alpha * stepSize;
+                    colorAcc += colBlend * (1. - colorAcc.w) * alpha * stepSizeInVolume;
                     minDist = min(minDist, curDist);
                 }
                 if (colorAcc.w > 0.99) break;
-                curDist += stepSize;
+                curDist += stepSizeInVolume;
             }
             colorAcc.xyz /= (0.001 + colorAcc.w);
             colorAcc.xyz = remap01(colorAcc.xyz, fragmentParamsVolumeFinalColor.y, fragmentParamsVolumeFinalColor.z);
             colorAcc.xyz = pow(colorAcc.xyz, fragmentParamsVolumeFinalColor.x);
-            colorAcc.xyz = val32();
+            colorAcc.xyz = GammaToLinearSimple(colorAcc.xyz);
             colorAcc.w = clamp(pow(colorAcc.w, fragmentParamsVolumeFinalColorBlend.x) * fragmentParamsVolumeFinalColorBlend.y, 0., 1.);
             volumePixelColor = colorAcc;
         };
-        outputDist = minDist;
-        // color = pixelColor;
-        // OUTPUT1 = color;
-        // OUTPUT2 = outputDist;
+        float outputDist = minDist;
+
         return lerp(basePixelColor, volumePixelColor, volumePixelColor.w);
     }
     ENDHLSL
