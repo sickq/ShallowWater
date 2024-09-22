@@ -199,7 +199,7 @@ Shader "Hidden/VolumeCloud"
 
     float4 val5(void)
     {
-        worldUV2 = (v2.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;;
+        worldUV2 = (v2.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz;
         return tex2D(fragmentTextures0, worldUV2);
     }
 
@@ -209,14 +209,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x);
         f = frac(x);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val6(void)
     {
-        p = pt + float3(0., 0., -1.) * noiseTime;
+        p = pt + float3(0., -1., 0.0) * noiseTime;
         return val7() * 2. - 1.;
     }
 
@@ -226,14 +226,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x2);
         f = frac(x2);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val8(void)
     {
-        p2 = pt * 2. + float3(-0.9, 0., -1.1) * noiseTime;
+        p2 = pt * 2. + float3(-0.9, -1.1, 0.) * noiseTime;
         return val9() * 2. - 1.;
     }
 
@@ -243,14 +243,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x3);
         f = frac(x3);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val10(void)
     {
-        p3 = pt * 4. + float3(0.8, 0.95, -1.2) * noiseTime;
+        p3 = pt * 4. + float3(0.8, -1.2, 0.95) * noiseTime;
         return val11() * 2. - 1.;
     }
 
@@ -260,14 +260,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x4);
         f = frac(x4);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val12(void)
     {
-        p4 = pt * 8. + float3(0., -0.84, -1.3) * noiseTime;
+        p4 = pt * 8. + float3(0., -1.3, -0.84) * noiseTime;
         return val13() * 2. - 1.;
     }
 
@@ -277,14 +277,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x5);
         f = frac(x5);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val14(void)
     {
-        p5 = pt * 12. + float3(0., 0., 1.5) * noiseTime;
+        p5 = pt * 12. + float3(0., 1.5, 0.) * noiseTime;
         return val15() * 2. - 1.;
     }
 
@@ -328,13 +328,26 @@ Shader "Hidden/VolumeCloud"
         samplePt4 = samplePt3;
         terrainZ3 = terrainZ2;
         dblend2 = dblend;
-        sampleHeight = clamp((samplePt4.y - terrainZ3) / fragmentParamsVolumeColorLerp.x, 0., 1.);
+        sampleHeight = clamp((samplePt4.y - terrainZ3) / fragmentParams[5].w, 0., 1.);
         col2 = curFow.xyz;
-        col2 = lerp(col2 * fragmentParamsColorNear, col2, clamp(sampleHeight, 0., 1.));
-        col2 *= fragmentParamsColorNear.w;
-        col2 = lerp(col2, fragmentParamsColorFar, dblend2);
+        col2 = lerp(col2 * fragmentParams[4].xyz, col2, clamp(sampleHeight, 0., 1.));
+        col2 *= fragmentParams[3].w;
+        col2 = lerp(col2, fragmentParams[0].xyz, dblend2);
         return col2;
     }
+
+    // float3 val19(void)
+    // {
+    //     samplePt4 = samplePt3;
+    //     terrainZ3 = terrainZ2;
+    //     dblend2 = dblend;
+    //     sampleHeight = clamp((samplePt4.y - terrainZ3) / fragmentParamsVolumeColorLerp.x, 0., 1.);
+    //     col2 = curFow.xyz;
+    //     col2 = lerp(col2 * fragmentParamsColorNear, col2, clamp(sampleHeight, 0., 1.));
+    //     col2 *= fragmentParamsColorNear.w;
+    //     col2 = lerp(col2, fragmentParamsColorFar, dblend2);
+    //     return col2;
+    // }
 
     float4 val21(void)
     {
@@ -348,14 +361,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x6);
         f = frac(x6);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val22(void)
     {
-        p6 = pt + float3(0., 0., -1.) * noiseTime;
+        p6 = pt + float3(0., -1., 0.0) * noiseTime;
         return val23() * 2. - 1.;
     }
 
@@ -365,14 +378,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x7);
         f = frac(x7);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val24(void)
     {
-        p7 = pt * 2. + float3(-0.9, 0., -1.1) * noiseTime;
+        p7 = pt * 2. + float3(-0.9, -1.1, 0.) * noiseTime;
         return val25() * 2. - 1.;
     }
 
@@ -382,14 +395,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x8);
         f = frac(x8);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val26(void)
     {
-        p8 = pt * 4. + float3(0.8, 0.95, -1.2) * noiseTime;
+        p8 = pt * 4. + float3(0.8, -1.2, 0.95) * noiseTime;
         return val27() * 2. - 1.;
     }
 
@@ -399,14 +412,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x9);
         f = frac(x9);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val28(void)
     {
-        p9 = pt * 8. + float3(0., -0.84, -1.3) * noiseTime;
+        p9 = pt * 8. + float3(0., -1.3, -0.84) * noiseTime;
         return val29() * 2. - 1.;
     }
 
@@ -416,14 +429,14 @@ Shader "Hidden/VolumeCloud"
         i3 = floor(x10);
         f = frac(x10);
         f = f * f * (3. - 2. * f);
-        uv3 = (i3.xy + float2(37., 239.) * i3.z) + f.xy;
+        uv3 = (i3.xz + float2(37., 239.) * i3.y) + f.xz;
         rg = tex2D(fragmentTextures1, (uv3 + 0.5) / 256.).yx;
-        return lerp(rg.x, rg.y, f.z);
+        return lerp(rg.x, rg.y, f.y);
     }
 
     float val30(void)
     {
-        p10 = pt * 12. + float3(0., 0., 1.5) * noiseTime;
+        p10 = pt * 12. + float3(0., 1.5, 0.0) * noiseTime;
         return val31() * 2. - 1.;
     }
 
