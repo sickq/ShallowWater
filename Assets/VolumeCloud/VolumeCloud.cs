@@ -10,12 +10,16 @@ public class VolumeCloud : MonoBehaviour
     public Transform VolumeTrans;
     
     public Texture2D fragmentTexture0;
-    public Texture2D fragmentTexture1;
     public Texture2D fragmentTexture2;
-    public Texture2D fragmentTexture5;
 
-    [Range(0, 200)]
-    public float VolumeColorLerpHeight = 25;
+    [Range(0.1f, 1f)]public float VolumeCloudRTScale = 1.0f;
+    
+    public Texture2D noiseTexture;
+    public Texture2D ditherNoiseTexture;
+    [Range(0, 5)] public int VolumeSampleNoiseIter = 4;
+    [Range(0, 5)] public int LightSampleNoiseIter = 2;
+
+    [Range(0, 200)] public float VolumeColorLerpHeight = 25;
     
     [Range(0, 50)] public float RayCameraLength = 8.0f;
     [Header("云内部的步进Size，默认值2")]
@@ -24,6 +28,10 @@ public class VolumeCloud : MonoBehaviour
     
     //超出边界，停止Marching
     [Range(0, 1)] public float RayEdgeStop = 0.06f;
+
+    [Range(-20, 20)]public float RayStartHeightOffset = 5.0f;
+    [Range(0, 1)]public float RayHeightScale = 0.02f;
+    [Range(0, 2)]public float RayScale = 0.4995f;
 
     [Range(0, 1024)] public float DitherNoiseUVScaleX = 256;
     [Range(0, 1024)] public float DitherNoiseUVScaleY = 256;
@@ -34,8 +42,6 @@ public class VolumeCloud : MonoBehaviour
     [Range(0, 1)] public float NoiseScale = 0.0773f;
     [Range(0, 2)] public float NoiseScaleY = 1.0f;
 
-    [Range(0, 2)] public float VolumeShapeWeight = 0.4995f;
-    
     [ColorUsage(false, true)] public Color colorFar;
     [ColorUsage(false, true)] public Color colorNear;
     [Range(0, 2)] public float colorNearWeight = 1.0f;
@@ -99,11 +105,9 @@ public class VolumeCloud : MonoBehaviour
 
     private void OnEnable()
     {
-        if (VolumeCloudShader != null)
-        {
-            VolumeCloudMaterial = new Material(VolumeCloudShader);
-        }
-        
+        PipelineUtils.ReleaseMaterial(ref VolumeCloudMaterial);
+        VolumeCloudMaterial = new Material(VolumeCloudShader);
+
         if (cmdBuffer == null)
         {
             cmdBuffer = new CommandBuffer { name = "VolumeCloud" };
@@ -119,6 +123,7 @@ public class VolumeCloud : MonoBehaviour
     
     private void OnDisable()
     {
+        PipelineUtils.ReleaseMaterial(ref VolumeCloudMaterial);
         if (curCamera != null)
         {
             curCamera.RemoveCommandBuffer(CameraEvent.BeforeImageEffects, cmdBuffer);
@@ -129,44 +134,55 @@ public class VolumeCloud : MonoBehaviour
         curCamera.depthTextureMode = DepthTextureMode.None;
     }
 
-    private static int _VolumeTempRT = Shader.PropertyToID("_VolumeTempRT");
+    private static int _VolumeCloudTempRT = Shader.PropertyToID("_VolumeCloudTempRT");
+    private static int _VolumeCloudTempRT1 = Shader.PropertyToID("_VolumeCloudTempRT1");
+    private static int _VolumeCloudOutputRT = Shader.PropertyToID("_VolumeCloudOutputRT");
+    
     private void OnPreRender()
     {
-        // Shader.SetGlobalTexture("fragmentTextures0", fragmentTexture0);
-        // Shader.SetGlobalTexture("fragmentTextures1", fragmentTexture1);
-        // Shader.SetGlobalTexture("fragmentTextures2", fragmentTexture2);
-        // Shader.SetGlobalTexture("fragmentTextures5", fragmentTexture5);
-        
         if (cmdBuffer == null) return;
         cmdBuffer.Clear();
+
+        int width = (int)(curCamera.pixelWidth * VolumeCloudRTScale);
+        int height = (int)(curCamera.pixelHeight * VolumeCloudRTScale);
         
         cmdBuffer.SetGlobalTexture("fragmentTextures0", fragmentTexture0);
-        cmdBuffer.SetGlobalTexture("fragmentTextures1", fragmentTexture1);
         cmdBuffer.SetGlobalTexture("fragmentTextures2", fragmentTexture2);
-        cmdBuffer.SetGlobalTexture("fragmentTextures5", fragmentTexture5);
-        cmdBuffer.SetGlobalVector("_LightDir", mainLight.transform.forward);
-        cmdBuffer.SetGlobalVector("_LightColor", mainLight.color.linear * mainLight.intensity);
-        cmdBuffer.SetGlobalVector("_VolumeCloudParamsOffset", VolumeCloudParamsOffset);
-        cmdBuffer.SetGlobalVector("_VolumeDistanceParams", new Vector4(DistanceFar, DistanceNear, DistanceBase));
-        cmdBuffer.SetGlobalVector("fragmentParamsColorFar", new Vector4(colorFar.r, colorFar.g, colorFar.b, 1));
-        cmdBuffer.SetGlobalVector("fragmentParamsColorNear", new Vector4(colorNear.r, colorNear.g, colorNear.b, colorNearWeight));
-        cmdBuffer.SetGlobalVector("fragmentParamsRay", new Vector4(RayLightLength, RayCameraLength, RayEdgeStop, RayCameraInCloudLength));
-        cmdBuffer.SetGlobalVector("fragmentParamsNoise", new Vector4(NoiseWeight, NoiseSpeed, NoiseScale, NoiseScaleY));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeShape", new Vector4(VolumeShapeWeight, 0));
-        cmdBuffer.SetGlobalVector("fragmentParamsDitherNoise", new Vector4(DitherNoiseUVScaleX, DitherNoiseUVScaleY, DitherNoiseOffset));
-        cmdBuffer.SetGlobalVector("fragmentParamsRenderResolution", new Vector4(curCamera.pixelWidth, curCamera.pixelHeight));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeColorLerp", new Vector4(VolumeColorLerpHeight, 1));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalColorBlend", new Vector4(FinalColorBlendPow, FinalColorBlendWeight));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalColor", new Vector4(FinalColorPow, FinalColorRemapLeft, FinalColorRemapRight));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeFinalAlpha", new Vector4(FinalAlphaDistance, 1));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeLight", new Vector4(lightColorIntensity, 1));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundPivot", (VolumeTrans.position - VolumeTrans.lossyScale / 2));
-        cmdBuffer.SetGlobalVector("fragmentParamsVolumeBoundSize", VolumeTrans.lossyScale);
-
-        cmdBuffer.SetGlobalVectorArray("fragmentParams", fragmentParams);
         
-        cmdBuffer.GetTemporaryRT(_VolumeTempRT, curCamera.pixelWidth, curCamera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
-        cmdBuffer.Blit(BuiltinRenderTextureType.CameraTarget, _VolumeTempRT, VolumeCloudMaterial);
-        cmdBuffer.Blit(_VolumeTempRT, BuiltinRenderTextureType.CameraTarget);
+        VolumeCloudMaterial.SetTexture("_VolumeNoiseTexture", noiseTexture);
+        VolumeCloudMaterial.SetTexture("_VolumeDitherNoiseTexture", ditherNoiseTexture);
+        
+        VolumeCloudMaterial.SetVector("_LightDir", mainLight.transform.forward);
+        VolumeCloudMaterial.SetVector("_LightColor", mainLight.color.linear * mainLight.intensity);
+        VolumeCloudMaterial.SetVector("_VolumeCloudParamsOffset", VolumeCloudParamsOffset);
+        VolumeCloudMaterial.SetVector("_VolumeCloudNoiseIterParams", new Vector4(VolumeSampleNoiseIter, LightSampleNoiseIter));
+        VolumeCloudMaterial.SetVector("_VolumeDistanceParams", new Vector4(DistanceFar, DistanceNear, DistanceBase));
+        VolumeCloudMaterial.SetVector("fragmentParamsColorFar", new Vector4(colorFar.r, colorFar.g, colorFar.b, 1));
+        VolumeCloudMaterial.SetVector("fragmentParamsColorNear", new Vector4(colorNear.r, colorNear.g, colorNear.b, colorNearWeight));
+        VolumeCloudMaterial.SetVector("fragmentParamsRay", new Vector4(RayLightLength, RayCameraLength, RayEdgeStop, RayCameraInCloudLength));
+        VolumeCloudMaterial.SetVector("fragmentParamsNoise", new Vector4(NoiseWeight, NoiseSpeed, NoiseScale, NoiseScaleY));
+        VolumeCloudMaterial.SetVector("fragmentParamsRayData", new Vector4(RayStartHeightOffset, RayHeightScale, RayScale));
+        VolumeCloudMaterial.SetVector("fragmentParamsDitherNoise", new Vector4(DitherNoiseUVScaleX, DitherNoiseUVScaleY, DitherNoiseOffset));
+        VolumeCloudMaterial.SetVector("fragmentParamsRenderResolution", new Vector4(width, height));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeColorLerp", new Vector4(VolumeColorLerpHeight, 1));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeFinalColorBlend", new Vector4(FinalColorBlendPow, FinalColorBlendWeight));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeFinalColor", new Vector4(FinalColorPow, FinalColorRemapLeft, FinalColorRemapRight));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeFinalAlpha", new Vector4(FinalAlphaDistance, 1));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeLight", new Vector4(lightColorIntensity, 1));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeBoundPivot", (VolumeTrans.position - VolumeTrans.lossyScale / 2));
+        VolumeCloudMaterial.SetVector("fragmentParamsVolumeBoundSize", VolumeTrans.lossyScale);
+
+        VolumeCloudMaterial.SetVectorArray("fragmentParams", fragmentParams);
+        
+        cmdBuffer.GetTemporaryRT(_VolumeCloudTempRT, width, height, 0, FilterMode.Bilinear, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        cmdBuffer.GetTemporaryRT(_VolumeCloudTempRT1, width, height, 0, FilterMode.Bilinear, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+        cmdBuffer.Blit(BuiltinRenderTextureType.CameraTarget, _VolumeCloudTempRT, VolumeCloudMaterial, 0);
+        cmdBuffer.Blit(_VolumeCloudTempRT, _VolumeCloudTempRT1, VolumeCloudMaterial, 1);
+        cmdBuffer.Blit(_VolumeCloudTempRT1, _VolumeCloudTempRT, VolumeCloudMaterial, 2);
+
+        cmdBuffer.GetTemporaryRT(_VolumeCloudOutputRT, curCamera.pixelWidth, curCamera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.Default);
+        cmdBuffer.Blit(BuiltinRenderTextureType.CameraTarget, _VolumeCloudOutputRT);
+        cmdBuffer.SetGlobalTexture("_VolumeCloudTempRT", _VolumeCloudTempRT);
+        cmdBuffer.Blit(_VolumeCloudOutputRT, BuiltinRenderTextureType.CameraTarget, VolumeCloudMaterial, 3);
     }
 }

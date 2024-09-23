@@ -57,9 +57,6 @@ Shader "Hidden/VolumeCloud"
         return normalize((worldPos - _WorldSpaceCameraPos).xyz);
     }
 
-    uniform float4 fragmentGlobals[5];
-    uniform float4 fragmentParams[13];
-
     uniform float4 _LightDir;
     uniform float4 _LightColor;
     float4 _VolumeCloudParamsOffset;
@@ -68,7 +65,7 @@ Shader "Hidden/VolumeCloud"
     float4 fragmentParamsVolumeBoundPivot;
     float4 fragmentParamsVolumeBoundSize;
 
-    float4 fragmentParamsVolumeShape;
+    float4 fragmentParamsRayData;
     
     float4 fragmentParamsVolumeColorLerp;
     float4 fragmentParamsVolumeFinalColorBlend;
@@ -82,13 +79,17 @@ Shader "Hidden/VolumeCloud"
     float4 fragmentParamsRay;
     float4 fragmentParamsNoise;
 
+    float4 _VolumeCloudNoiseIterParams;
+
     float4 fragmentParamsDitherNoise;
     float4 fragmentParamsRenderResolution;
 
     sampler2D fragmentTextures0;
-    sampler2D fragmentTextures1;
     sampler2D fragmentTextures2;
-    sampler2D fragmentTextures5;
+
+    sampler2D _VolumeNoiseTexture;
+    sampler2D _VolumeDitherNoiseTexture;
+    float4 _VolumeDitherNoiseTexture_TexelSize;
 
 
     static const int KernelSize = 5;
@@ -119,18 +120,13 @@ Shader "Hidden/VolumeCloud"
         return tex2D(fragmentTextures0, worldUV);
     }
 
-    float val2(float3 targetPoint, float3 noiseScale, float time)
+    float val2(float3 targetPoint)
     {
         float4 curFow = sampleFow(targetPoint);
         float fogHeight = curFow.w;
-        float d2 = (fragmentParams[2].z + fogHeight - targetPoint.y) * fragmentParams[5].z;
+        float d2 = (fragmentParamsRayData.x + fogHeight - targetPoint.y) * fragmentParamsRayData.y;
         
-        float noiseTime = time * fragmentParamsNoise.y;
-        float tnoise = 0.;
-        float pt = targetPoint * noiseScale;
-        d2 += tnoise * fragmentParamsNoise.x;
-        
-        d2 *= fragmentParams[6].x;
+        d2 *= fragmentParamsRayData.z;
         return d2;
     }
 
@@ -141,7 +137,7 @@ Shader "Hidden/VolumeCloud"
         targetPointDecimal = targetPointDecimal * targetPointDecimal * (3. - 2. * targetPointDecimal);
 
         float2 noiseUV = (targetPointInt.xz + float2(37., 239.) * targetPointInt.y) + targetPointDecimal.xz;
-        float2 noiseRG = tex2D(fragmentTextures1, (noiseUV + 0.5) / 256.).yx;
+        float2 noiseRG = tex2D(_VolumeNoiseTexture, (noiseUV + 0.5) / 256.).yx;
         return lerp(noiseRG.x, noiseRG.y, targetPointDecimal.y);
     }
 
@@ -154,25 +150,25 @@ Shader "Hidden/VolumeCloud"
     float VolumeCloudNoise(float3 targetPoint, float4 fowData, float3 noiseScale, float time)
     {
         float fogHeight = fowData.w;
-        float d2 = (0. + fogHeight - targetPoint.y) * fragmentParams[5].z;
+        float d2 = (0. + fogHeight - targetPoint.y) * fragmentParamsRayData.y;
         
         float noiseTime = time * fragmentParamsNoise.y;
         float tnoise = 0.;
         float3 scalePoint = targetPoint * noiseScale;
-        if (int(fragmentParams[4].w) >= 1) tnoise += sampleNoiseOffset(scalePoint, 0, noiseTime);
-        if (int(fragmentParams[4].w) >= 2) tnoise += sampleNoiseOffset(scalePoint, 1, noiseTime) * 1. / _VolumeCloudParamsOffset.x;
-        if (int(fragmentParams[4].w) >= 3) tnoise += sampleNoiseOffset(scalePoint, 2, noiseTime) * 1. / _VolumeCloudParamsOffset.y;
-        if (int(fragmentParams[4].w) >= 4) tnoise += sampleNoiseOffset(scalePoint, 3, noiseTime) * 1. / _VolumeCloudParamsOffset.z;
-        if (int(fragmentParams[4].w) >= 5) tnoise += sampleNoiseOffset(scalePoint, 4, noiseTime) * 1. / _VolumeCloudParamsOffset.w;
+        if (int(_VolumeCloudNoiseIterParams.x) >= 1) tnoise += sampleNoiseOffset(scalePoint, 0, noiseTime);
+        if (int(_VolumeCloudNoiseIterParams.x) >= 2) tnoise += sampleNoiseOffset(scalePoint, 1, noiseTime) * 1. / _VolumeCloudParamsOffset.x;
+        if (int(_VolumeCloudNoiseIterParams.x) >= 3) tnoise += sampleNoiseOffset(scalePoint, 2, noiseTime) * 1. / _VolumeCloudParamsOffset.y;
+        if (int(_VolumeCloudNoiseIterParams.x) >= 4) tnoise += sampleNoiseOffset(scalePoint, 3, noiseTime) * 1. / _VolumeCloudParamsOffset.z;
+        if (int(_VolumeCloudNoiseIterParams.x) >= 5) tnoise += sampleNoiseOffset(scalePoint, 4, noiseTime) * 1. / _VolumeCloudParamsOffset.w;
 
         d2 += tnoise * fragmentParamsNoise.x;
-        d2 *= fragmentParamsVolumeShape.x;
+        d2 *= fragmentParamsRayData.z;
         return d2;
     }
 
     float sampleTerrainY(float3 targetPoint)
     {
-        return tex2D(fragmentTextures2, targetPoint.xz / fragmentParamsVolumeBoundSize.xz).x;
+        return tex2D(fragmentTextures2, (targetPoint.xz - fragmentParamsVolumeBoundPivot.xz) / fragmentParamsVolumeBoundSize.xz).x;
     }
 
     float CalculateDistFactor(float dist)
@@ -181,7 +177,7 @@ Shader "Hidden/VolumeCloud"
         return dfactor * dfactor;
     }
 
-    float3 calculateVolumeFogColor(float3 targetPoint, float terrainY, float distBlend, float3 fowColor)
+    float3 calculateVolumeCloudColor(float3 targetPoint, float terrainY, float distBlend, float3 fowColor)
     {
         float sampleHeight = clamp((targetPoint.y - terrainY) / fragmentParamsVolumeColorLerp.x, 0., 1.);
         float3 col2 = fowColor.xyz;
@@ -196,24 +192,24 @@ Shader "Hidden/VolumeCloud"
         targetPoint = targetPoint + lightStep;
         float4 curFow = sampleFow(targetPoint);
         float fogHeight = curFow.w;
-        float d2 = (0. + fogHeight - targetPoint.y) * fragmentParams[5].z;
+        float d2 = (0. + fogHeight - targetPoint.y) * fragmentParamsRayData.y;
         float noiseTime = time * fragmentParamsNoise.y;
         float tnoise = 0.;
         float3 scalePoint = targetPoint * noiseScale;
-        if (int(fragmentParams[5].w) >= 1) tnoise += sampleNoiseOffset(scalePoint, 0, noiseTime);
-        if (int(fragmentParams[5].w) >= 2) tnoise += sampleNoiseOffset(scalePoint, 1, noiseTime) * 1. / _VolumeCloudParamsOffset.x;
-        if (int(fragmentParams[5].w) >= 3) tnoise += sampleNoiseOffset(scalePoint, 2, noiseTime) * 1. / _VolumeCloudParamsOffset.y;
-        if (int(fragmentParams[5].w) >= 4) tnoise += sampleNoiseOffset(scalePoint, 3, noiseTime) * 1. / _VolumeCloudParamsOffset.z;
-        if (int(fragmentParams[5].w) >= 5) tnoise += sampleNoiseOffset(scalePoint, 4, noiseTime) * 1. / _VolumeCloudParamsOffset.w;
+        if (int(_VolumeCloudNoiseIterParams.y) >= 1) tnoise += sampleNoiseOffset(scalePoint, 0, noiseTime);
+        if (int(_VolumeCloudNoiseIterParams.y) >= 2) tnoise += sampleNoiseOffset(scalePoint, 1, noiseTime) * 1. / _VolumeCloudParamsOffset.x;
+        if (int(_VolumeCloudNoiseIterParams.y) >= 3) tnoise += sampleNoiseOffset(scalePoint, 2, noiseTime) * 1. / _VolumeCloudParamsOffset.y;
+        if (int(_VolumeCloudNoiseIterParams.y) >= 4) tnoise += sampleNoiseOffset(scalePoint, 3, noiseTime) * 1. / _VolumeCloudParamsOffset.z;
+        if (int(_VolumeCloudNoiseIterParams.y) >= 5) tnoise += sampleNoiseOffset(scalePoint, 4, noiseTime) * 1. / _VolumeCloudParamsOffset.w;
         
         d2 += tnoise * fragmentParamsNoise.x;
-        d2 *= fragmentParamsVolumeShape.x;
+        d2 *= fragmentParamsRayData.z;
         return d2;
     }
 
     float4 calculateColorBlend(float3 targetPoint, float terrainY, float distBlend, float volumeShape, float3 fowColor, float time, float3 lightStep, float3 noiseScale)
     {
-        float3 color = calculateVolumeFogColor(targetPoint, terrainY, distBlend, fowColor);
+        float3 color = calculateVolumeCloudColor(targetPoint, terrainY, distBlend, fowColor);
         float dirLight = max(0., volumeShape - sampleLightNoise(targetPoint, lightStep, noiseScale, time));
         color += clamp(dirLight * _LightColor * fragmentParamsVolumeLight.x, 0., 1.);
         float a = clamp(volumeShape, 0., 1.);
@@ -246,14 +242,13 @@ Shader "Hidden/VolumeCloud"
         float3 noiseScale = fragmentParamsNoise.z;
         noiseScale.y *= fragmentParamsNoise.w;
         
-        float4 basePixelColor = float4(tex2D(_MainTex, input.texcoord).xyz, 0.);
-        float4 volumePixelColor = 0;
+        float4 volumePixelColor = float4(tex2D(_MainTex, input.texcoord).xyz, 0.);
         float3 camRay = GetRay(worldPos.xyz);
 
         float depthDist = min(_VolumeDistanceParams.x + _VolumeDistanceParams.y, length((worldPos - _WorldSpaceCameraPos.xyz)));
         
-        float2 nuv = input.texcoord * fragmentParamsRenderResolution.xy / fragmentParamsDitherNoise.xy;
-        float ditherNoise = tex2D(fragmentTextures5, nuv).x;
+        float2 nuv = input.texcoord * fragmentParamsRenderResolution.xy / _VolumeDitherNoiseTexture_TexelSize.zw;
+        float ditherNoise = tex2D(_VolumeDitherNoiseTexture, nuv).x;
         ditherNoise = frac(ditherNoise + float(int(fragmentParamsDitherNoise.z)) * 0.61803398875);
         
         float3 lightStep = -_LightDir.xyz * fragmentParamsRay.x;
@@ -268,7 +263,7 @@ Shader "Hidden/VolumeCloud"
         for (int i = 0; i < numSteps; i++)
         {
             float3 samplePt = _WorldSpaceCameraPos.xyz + camRay * d;
-            float dens = val2(samplePt, noiseScale, curTime);
+            float dens = val2(samplePt);
             if (dens > fragmentParamsRay.z)
             {
                 startD = max(0., d - fragmentParamsRay.y);
@@ -312,11 +307,43 @@ Shader "Hidden/VolumeCloud"
             colorAcc.xyz = GammaToLinearSimple(colorAcc.xyz);
             colorAcc.w = clamp(pow(colorAcc.w, fragmentParamsVolumeFinalColorBlend.x) * fragmentParamsVolumeFinalColorBlend.y, 0., 1.);
             volumePixelColor = colorAcc;
-        };
+        }
+
+        //TODO 需要注意这里，如果需要雾效的深度，需要处理一下
         float outputDist = minDist;
 
-        return lerp(basePixelColor, volumePixelColor, volumePixelColor.w);
+        return volumePixelColor;
     }
+
+    #define VolumeBlurParam float4(0.46584, 0.26708, 1.32082, 0)
+    
+    half4 fragBlurX(VaryingsDefault input) : SV_Target
+    {
+        float4 uvOffset = _MainTex_TexelSize.xyxy * float4(1, 0, -1, 0);
+        half4 color = tex2D(_MainTex, input.texcoord) * VolumeBlurParam.x;
+        color += tex2D(_MainTex, input.texcoord + uvOffset.xy * VolumeBlurParam.z) * VolumeBlurParam.y;
+        color += tex2D(_MainTex, input.texcoord + uvOffset.zw * VolumeBlurParam.z) * VolumeBlurParam.y;
+        return color;
+    }
+
+    half4 fragBlurY(VaryingsDefault input) : SV_Target
+    {
+        float4 uvOffset = _MainTex_TexelSize.xyxy * float4(0, 1, 0, -1);
+        half4 color = tex2D(_MainTex, input.texcoord) * VolumeBlurParam.x;
+        color += tex2D(_MainTex, input.texcoord + uvOffset.xy * VolumeBlurParam.z) * VolumeBlurParam.y;
+        color += tex2D(_MainTex, input.texcoord + uvOffset.zw * VolumeBlurParam.z) * VolumeBlurParam.y;
+        return color;
+    }
+
+    sampler2D _VolumeCloudTempRT;
+    half4 fragCombine(VaryingsDefault input) : SV_Target
+    {
+        half4 pixelColor = tex2D(_MainTex, input.texcoord);
+        half4 volumeColor = tex2D(_VolumeCloudTempRT, input.texcoord);
+        pixelColor.rgb = lerp(pixelColor.rgb, volumeColor.rgb, volumeColor.a * volumeColor.a);
+        return pixelColor;
+    }
+    
     ENDHLSL
 
     SubShader
@@ -329,6 +356,36 @@ Shader "Hidden/VolumeCloud"
             HLSLPROGRAM
             #pragma vertex VertDefaultQuad
             #pragma fragment frag
+
+            #pragma exclude_renderers d3d11_9x
+            ENDHLSL
+        }
+        
+        Pass
+        {
+            HLSLPROGRAM
+            #pragma vertex VertDefaultQuad
+            #pragma fragment fragBlurX
+
+            #pragma exclude_renderers d3d11_9x
+            ENDHLSL
+        }
+        
+        Pass
+        {
+            HLSLPROGRAM
+            #pragma vertex VertDefaultQuad
+            #pragma fragment fragBlurY
+
+            #pragma exclude_renderers d3d11_9x
+            ENDHLSL
+        }
+        
+        Pass
+        {
+            HLSLPROGRAM
+            #pragma vertex VertDefaultQuad
+            #pragma fragment fragCombine
 
             #pragma exclude_renderers d3d11_9x
             ENDHLSL

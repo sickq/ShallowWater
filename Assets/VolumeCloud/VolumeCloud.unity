@@ -217,14 +217,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   VolumeTrans: {fileID: 164760035}
   fragmentTexture0: {fileID: 2800000, guid: 8b8f8fc7859e0614aaeee598ca7e3d16, type: 2}
-  fragmentTexture1: {fileID: 2800000, guid: 4b06071b827531548982d0bf52a3810f, type: 3}
   fragmentTexture2: {fileID: 2800000, guid: 5174da4818fbb714a86e2b8eb9d79b2b, type: 2}
-  fragmentTexture5: {fileID: 2800000, guid: 5ca0eb4743d9cf044bb058fc689507f1, type: 3}
+  VolumeCloudRTScale: 0.7
+  noiseTexture: {fileID: 2800000, guid: 4b06071b827531548982d0bf52a3810f, type: 3}
+  ditherNoiseTexture: {fileID: 2800000, guid: 5ca0eb4743d9cf044bb058fc689507f1, type: 3}
+  VolumeSampleNoiseIter: 4
+  LightSampleNoiseIter: 2
   VolumeColorLerpHeight: 25
   RayCameraLength: 8
   RayCameraInCloudLength: 2
   RayLightLength: 8
   RayEdgeStop: 0.06
+  RayStartHeightOffset: 5
+  RayHeightScale: 0.02
+  RayScale: 0.4995
   DitherNoiseUVScaleX: 256
   DitherNoiseUVScaleY: 256
   DitherNoiseOffset: 494
@@ -232,7 +238,6 @@ MonoBehaviour:
   NoiseSpeed: 0.4
   NoiseScale: 0.0773
   NoiseScaleY: 1
-  VolumeShapeWeight: 0.4995
   colorFar: {r: 0.89906, g: 0.74114, b: 0.48176, a: 0}
   colorNear: {r: 0.67059, g: 0.48235, b: 0.36471, a: 0}
   colorNearWeight: 1
@@ -240,12 +245,12 @@ MonoBehaviour:
   DistanceFar: 600
   DistanceNear: 50
   DistanceBase: -2
-  FinalAlphaTemp: 2
   FinalColorBlendPow: 1.5
   FinalColorBlendWeight: 1.1
   FinalColorPow: 1
   FinalColorRemapLeft: 0
   FinalColorRemapRight: 1
+  FinalAlphaDistance: 2
   VolumeCloudShader: {fileID: 4800000, guid: 974e5460d7f728b4183f6d064606f68b, type: 3}
 --- !u!81 &1480211366
 AudioListener:
@@ -314,13 +319,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1480211364}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
   m_LocalPosition: {x: 601, y: 73, z: 1646}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
 --- !u!1 &1652841081
 GameObject:
   m_ObjectHideFlags: 0
