@@ -1,9 +1,10 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
-#include "./Common.hlsl"
-
 #define PI 3.1415926535897932384626433832795f
+
+#define mPositionScale 0.001
+
+SamplerState samplerLinearClamp : register(s0);
 
 // MUST match SKYATMOSPHERE_BUFFER in SkyAtmosphereBruneton.hlsl
 cbuffer SKYATMOSPHERE_BUFFER : register(b1)
@@ -62,11 +63,14 @@ cbuffer SKYATMOSPHERE_BUFFER : register(b1)
 	//
 	// Other globals
 	//
-	float4x4 gSkyViewProjMat;
-	float4x4 gSkyInvViewProjMat;
-	float4x4 gSkyInvProjMat;
 	float4x4 gSkyInvViewMat;
-	float4x4 gShadowmapViewProjMat;
+	float4x4 gSkyInvProjMat;
+
+	float3 gResolution;
+	float4 gColor;
+	float3 gSunIlluminance;
+	int gScatteringMaxPathDepth;
+	float3 RayMarchMinMaxSPP;
 
 	float3 camera;	//CameraPos
 	float3 sun_direction;
@@ -147,8 +151,6 @@ AtmosphereParameters GetAtmosphereParameters()
 	return Parameters;
 }
 
-
-
 // - r0: ray origin
 // - rd: normalized ray direction
 // - s0: sphere center
@@ -199,4 +201,26 @@ void LutTransmittanceParamsToUv(AtmosphereParameters Atmosphere, in float viewHe
 
 	uv = float2(x_mu, x_r);
 	//uv = float2(fromUnitToSubUvs(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromUnitToSubUvs(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT)); // No real impact so off
+}
+
+// The constants below should match the one in SceneRendering.cpp
+// Kilometers as unit for computations related to the sky and its atmosphere
+#define M_TO_SKY_UNIT 0.001f
+#define SKY_UNIT_TO_M (1.0f/M_TO_SKY_UNIT)
+// Float accuracy offset in Sky unit (km, so this is 1m). Should match the one in FAtmosphereSetup::ComputeViewData
+#define PLANET_RADIUS_OFFSET 0.001f
+
+// Planet radius safe edge to make sure ray does intersect with the atmosphere, for it to traverse the atmosphere. Must match the one in FSceneRenderer::RenderSkyAtmosphereInternal.
+// This is (0.01km/6420km).
+#define PLANET_RADIUS_RATIO_SAFE_EDGE 1.00000155763f
+
+
+// The number of killometer per slice in the aerial pespective camera volume texture. (assuming a uniform depth distribution)
+#define AP_KM_PER_SLICE 4.0f
+#define AP_KM_PER_SLICE_INV (1.0f / AP_KM_PER_SLICE)
+
+float3 GetTranslatedCameraPlanetPos()
+{
+	AtmosphereParameters atmosphere = GetAtmosphereParameters();
+	return (camera - float3(0, 0, atmosphere.BottomRadius)) * M_TO_SKY_UNIT;
 }

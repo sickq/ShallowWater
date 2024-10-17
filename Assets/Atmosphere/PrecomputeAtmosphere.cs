@@ -6,13 +6,11 @@ namespace Atmosphere
 
     public class PrecomputeAtmosphere : MonoBehaviour
     {
-        public CommonConstantBufferStructure mConstantBufferCPU = new CommonConstantBufferStructure();
-        public SkyAtmosphereConstantBufferStructure cb = new SkyAtmosphereConstantBufferStructure();
+        private CommonConstantBufferStructure mConstantBufferCPU = new CommonConstantBufferStructure();
+        private SkyAtmosphereConstantBufferStructure cb = new SkyAtmosphereConstantBufferStructure();
         private Material renderSkyMat;
-        private float scale = 1 / 1000f;
+        private float scale = 0.001f;
         public bool currentMultiscatapprox = true;
-        public bool currentAerialPerspective = true;
-        // public bool currentShadowmap = true;
 
         public Light mainLight;
         public ComputeShader computeShader;
@@ -30,7 +28,7 @@ namespace Atmosphere
             
         }
 
-        private void Update()
+        private void LateUpdate()
         {
             UpdateConstantBuffer(Camera.main);
             PrecomputeTransmittanceLUT();
@@ -47,21 +45,10 @@ namespace Atmosphere
 
             PrecomputeSkyViewLUT();
             PrecomputeCameraVolumeWithRayMarch();
-            // RenderSky();
         }
 
         void UpdateConstantBuffer(Camera camera)
         {
-            // if (currentAerialPerspective)
-            //     AerialPerspectiveRenderFeature.material.EnableKeyword("FASTAERIALPERSPECTIVE_ENABLED");
-            // else
-            //     AerialPerspectiveRenderFeature.material.DisableKeyword("FASTAERIALPERSPECTIVE_ENABLED");
-            //
-            // if (currentShadowmap)
-            //     AerialPerspectiveRenderFeature.material.EnableKeyword("SHADOWMAP_ENABLED");
-            // else
-            //     AerialPerspectiveRenderFeature.material.DisableKeyword("SHADOWMAP_ENABLED");
-
             cb.BottomRadius = atmosphereData.EarthBottomRadius;
             cb.TopRadius = atmosphereData.EarthTopRadius;
             cb.RayleighDensityExpScale = atmosphereData.RayleighDensityExpScale;
@@ -105,9 +92,10 @@ namespace Atmosphere
             cb.gSkyInvViewMat = camera.worldToCameraMatrix.inverse;
             cb.gShadowmapViewProjMat = viewProjMat;
             // cb.camera = camera.transform.position * scale;
+            //兼容Unreal的代码，需要转换坐标系
             cb.camera = new Vector3(camera.transform.position.x, camera.transform.position.z, camera.transform.position.y) * scale;
             // cb.view_ray = -camera.transform.forward;
-            cb.sun_direction = new Vector3(-camera.transform.forward.x, -camera.transform.forward.z, -camera.transform.forward.y);
+            cb.view_ray = new Vector3(-camera.transform.forward.x, -camera.transform.forward.z, -camera.transform.forward.y);
 
             // cb.sun_direction = -mainLight.transform.forward;
             cb.sun_direction = new Vector3(-mainLight.transform.forward.x, -mainLight.transform.forward.z, -mainLight.transform.forward.y);
@@ -116,7 +104,6 @@ namespace Atmosphere
             mConstantBufferCPU.gColor = new Vector4(0.0f, 1.0f, 1.0f, 1.0f);
             mConstantBufferCPU.gResolution = new Vector3(camera.pixelWidth, camera.pixelHeight);
             mConstantBufferCPU.gSunIlluminance = Vector3.one * atmosphereData.mSunIlluminanceScale;
-            mConstantBufferCPU.gScreenshotCaptureActive = 0.5f;
             mConstantBufferCPU.gScatteringMaxPathDepth = NumScatteringOrder;
             uiViewRayMarchMaxSPP = uiViewRayMarchMinSPP >= uiViewRayMarchMaxSPP
                 ? uiViewRayMarchMinSPP + 1

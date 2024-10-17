@@ -1,18 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "./RenderSkyCommon.hlsl"
-#include "UnityCG.cginc"
 
-#define PI 3.1415926
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
-
-Texture2D _CameraDepthTexture;
-SamplerState sampler_CameraDepthTexture;
-
-SamplerState sampler_LinearClamp;
 
 struct SingleScatteringResult
 {
@@ -277,44 +270,6 @@ struct RayMarchPixelOutputStruct
     #endif
 };
 
-RayMarchPixelOutputStruct RenderRayMarchingPS(VertexOutput Input)
-{
-    RayMarchPixelOutputStruct output = (RayMarchPixelOutputStruct)0;
-    float2 pixPos = Input.position.xy;
-    AtmosphereParameters Atmosphere = GetAtmosphereParameters();
-    #if UNITY_REVERSED_Z
-    float3 ClipSpace = float3(pixPos / gResolution.xy * float2(2.0, -2.0) - float2(1.0, -1.0), 0.0);
-    #else
-    float3 ClipSpace = float3(pixPos / gResolution.xy * float2(2.0, -2.0) - float2(1.0, -1.0), 1.0);
-    #endif
-
-    float4 HViewPos = mul(gSkyInvProjMat, float4(ClipSpace, 1.0));
-    float3 WorldDir = normalize(mul((float3x3)gSkyInvViewMat, HViewPos.xyz / HViewPos.w));
-    float3 WorldPos = camera + float3(0, Atmosphere.BottomRadius, 0);
-
-    float viewHeight = length(WorldPos);
-    float2 uv;
-    float3 UpVector = normalize(WorldPos);
-    float viewZenithCosAngle = dot(WorldDir, UpVector);
-
-    float3 sideVector = normalize(cross(UpVector, WorldDir)); // assumes non parallel vectors
-    float3 forwardVector = normalize(cross(sideVector, UpVector));
-    // aligns toward the sun light but perpendicular to up vector
-    float2 lightOnPlane = float2(dot(sun_direction, forwardVector), dot(sun_direction, sideVector));
-    lightOnPlane = normalize(lightOnPlane);
-    float lightViewCosAngle = lightOnPlane.x;
-
-    bool IntersectGround = raySphereIntersectNearest(WorldPos, WorldDir, float3(0, 0, 0), Atmosphere.BottomRadius) >=
-        0.0f;
-
-    SkyViewLutParamsToUv(Atmosphere, IntersectGround, viewZenithCosAngle, lightViewCosAngle, viewHeight, uv);
-
-    output.Luminance = float4(
-        SkyViewLutTexture.SampleLevel(samplerLinearClamp, uv, 0).rgb + GetSunLuminance(
-            WorldPos, WorldDir, Atmosphere.BottomRadius), 1.0);
-    return output;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -330,20 +285,15 @@ void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
     float2 pixPos = float2(ThreadId.xy) + 0.5f;
     float2 uv = pixPos / MultiScatteringLUTRes;
 
-
     uv = float2(fromSubUvsToUnit(uv.x, MultiScatteringLUTRes), fromSubUvsToUnit(uv.y, MultiScatteringLUTRes));
 
     AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
     float cosSunZenithAngle = uv.x * 2.0 - 1.0;
-    // float3 sunDir = float3(sqrt(saturate(1.0 - cosSunZenithAngle * cosSunZenithAngle)), cosSunZenithAngle, 0.0);
     float3 sunDir = float3(0.0, sqrt(saturate(1.0 - cosSunZenithAngle * cosSunZenithAngle)), cosSunZenithAngle);
     // We adjust again viewHeight according to PLANET_RADIUS_OFFSET to be in a valid range.
     float viewHeight = Atmosphere.BottomRadius + saturate(uv.y + PLANET_RADIUS_OFFSET) * (Atmosphere.TopRadius -
         Atmosphere.BottomRadius - PLANET_RADIUS_OFFSET);
-
-    // float3 WorldPos = float3(0.0f, viewHeight, 0.0f);
-    // float3 WorldDir = float3(0.0f, 1.0f, 0.0f);
 
     float3 WorldPos = float3(0.0f, 0.0f, viewHeight);
     float3 WorldDir = float3(0.0f, 0.0f, 1.0f);
@@ -381,11 +331,6 @@ void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
         SingleScatteringResult result = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sunDir, Atmosphere,
                                                                     ground, SampleCountIni, DepthBufferValue,
                                                                     VariableSampleCount, MieRayPhase);
-
-
-
-        // MultiScatAs1SharedMem[ThreadId.z] = result.MultiScatAs1 * SphereSolidAngle / (sqrtSample * sqrtSample);
-        // LSharedMem[ThreadId.z] = result.L * SphereSolidAngle / (sqrtSample * sqrtSample);
 
         OutputTexture[ThreadId.xy] = float4(MultipleScatteringFactor * result.L, 1.0f);
         return;

@@ -50,10 +50,10 @@ void IntergalCameraVolumeLUT(uint3 id: SV_DispatchThreadID)
     float3 ClipSpace = float3(uv * float2(2.0, -2.0) - float2(1.0, -1.0), 0.5);
     float4 HViewPos = mul(gSkyInvProjMat, float4(ClipSpace, 1.0));
     float3 WorldDir = normalize(mul((float3x3)gSkyInvViewMat, HViewPos.xyz / HViewPos.w));
+    
     WorldDir = float3(WorldDir.x, WorldDir.z, WorldDir.y);
 
     float earthR = Atmosphere.BottomRadius;
-    // float3 camPos = camera + float3(0, earthR, 0);
     float3 camPos = camera + float3(0, 0, earthR);
     float3 SunDir = sun_direction;
     
@@ -98,37 +98,18 @@ void IntergalSkyViewLutPS(uint3 id: SV_DispatchThreadID)
     float2 pixPos = id.xy + 0.5f;
     AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
-    // float3 WorldPos = float3(0, camera.y, 0) + float3(0, Atmosphere.BottomRadius, 0);
     float3 WorldPos = camera + float3(0, 0, Atmosphere.BottomRadius);
+    // float3 WorldPos = float3(0, 0, Atmosphere.BottomRadius + camera.z);
     // float2 uv = pixPos / float2(192.0, 108.0);
     float2 uv = pixPos / float2(96.0, 104.0);
-
-    uv.x = uv.x * 1.0105263;
-    uv.y = -uv.y * 2.01941752 + 1.0;
     
     float weight = 1 - saturate(-uv.y);
     
-    float worldDirZ = max(uv.y, 0);
-    float3 worldDirTemp = 0;
-    worldDirTemp.z = worldDirZ;
-    
-    float sinZ = sqrt(1 - worldDirZ * worldDirZ);
-    
-    float aaa =  uv.x * uv.x * PI + (-0.95841);
-    float sinValue = sin(aaa);
-    float cosValue = cos(aaa);
-    
-    worldDirTemp.x = cosValue * sinZ;
-    worldDirTemp.y = sinValue * sinZ;
-    
-    
-    float viewHeight = length(WorldPos);
-    float viewZenithCosAngle;
-    float lightViewCosAngle;
-    UvToSkyViewLutParams(Atmosphere, viewZenithCosAngle, lightViewCosAngle, viewHeight, uv);
+    float3 WorldDir = 0;
 
-    // _SkyViewLUT[id.xy] = worldDirTemp;
-    // return;
+    float viewHeight = length(WorldPos);
+
+    UvToSkyViewLutParams(Atmosphere, WorldDir, viewHeight, uv);
 
     float3 SunDir;
     {
@@ -137,23 +118,9 @@ void IntergalSkyViewLutPS(uint3 id: SV_DispatchThreadID)
         // SunDir = normalize(float3(sqrt(1.0 - sunZenithCosAngle * sunZenithCosAngle), sunZenithCosAngle, 0.0));
         SunDir = normalize(float3(sqrt(1.0 - sunZenithCosAngle * sunZenithCosAngle), 0.0, sunZenithCosAngle));
     }
-    SunDir = sun_direction;
     
-    // WorldPos = float3(0.0f, viewHeight, 0.0f);
     WorldPos = float3(0.0f, 0.0f, viewHeight);
-    
-    float viewZenithSinAngle = sqrt(1 - viewZenithCosAngle * viewZenithCosAngle);
-    float3 WorldDir = float3(
-        viewZenithSinAngle * lightViewCosAngle,
-        viewZenithSinAngle * sqrt(1.0 - lightViewCosAngle * lightViewCosAngle),
-        viewZenithCosAngle);
 
-
-    WorldDir = worldDirTemp;
-
-    // _SkyViewLUT[id.xy] = WorldDir;
-    // return;
-    
     // Move to top atmospehre
     if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
     {

@@ -3,13 +3,6 @@
 
 #include "./SkyAtmosphereCommon.hlsl"
 
-#define GPUDEBUG_CLIENT
-#define GPU_DEBUG_LINEBUFFER_UAV      u2
-#define GPU_DEBUG_LINEDISPATCHIND_UAV u3
-#include "./GpuDebugPrimitives.hlsl"
-
-// #define FASTSKY_ENABLED 1
-// #define MULTISCATAPPROX_ENABLED 1
 Texture2D<float4>  TransmittanceLutTexture				: register(t1);
 Texture2D<float4>  SkyViewLutTexture					: register(t2);
 
@@ -18,10 +11,6 @@ Texture3D<float4>  AtmosphereCameraScatteringVolume		: register(t5);
 
 RWTexture2D<float4>  OutputTexture						: register(u0);
 RWTexture2D<float4>  OutputTexture1						: register(u1);
-
-
-#define DEBUGENABLED 0
-#define ToDebugWorld float3(0, 0, -ptc.Atmosphere.BottomRadius)
 
 #define RAYDPOS 0.00001f
 
@@ -105,41 +94,84 @@ void UvToLutTransmittanceParams(AtmosphereParameters Atmosphere, out float viewH
 }
 
 #define NONLINEARSKYVIEWLUT 1
-void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float viewZenithCosAngle, out float lightViewCosAngle, in float viewHeight, in float2 uv)
+
+void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float3 ViewDir, in float ViewHeight, in float2 UV)
 {
 	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
-	uv = float2(fromSubUvsToUnit(uv.x, 96.0f), fromSubUvsToUnit(uv.y, 104.0f));
+	UV.x = fromSubUvsToUnit(UV.x, 96.0f);
+	UV.y = fromSubUvsToUnit(UV.y, 104.0f);
 
-	float Vhorizon = sqrt(viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
-	float CosBeta = Vhorizon / viewHeight;				// GroundToHorizonCos
+	float Vhorizon = sqrt(ViewHeight * ViewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
+	float CosBeta = Vhorizon / ViewHeight;				// cos of zenith angle from horizon to zeniht
 	float Beta = acos(CosBeta);
 	float ZenithHorizonAngle = PI - Beta;
 
-	if (uv.y < 0.5f)
+	float ViewZenithAngle;
+	if (UV.y < 0.5f)
 	{
-		float coord = 2.0*uv.y;
-		coord = 1.0 - coord;
-#if NONLINEARSKYVIEWLUT
-		coord *= coord;
-#endif
-		coord = 1.0 - coord;
-		viewZenithCosAngle = cos(ZenithHorizonAngle * coord);
+		float Coord = 2.0f * UV.y;
+		Coord = 1.0f - Coord;
+		Coord *= Coord;
+		Coord = 1.0f - Coord;
+		ViewZenithAngle = ZenithHorizonAngle * Coord;
 	}
 	else
 	{
-		float coord = uv.y*2.0 - 1.0;
-#if NONLINEARSKYVIEWLUT
-		coord *= coord;
-#endif
-		viewZenithCosAngle = cos(ZenithHorizonAngle + Beta * coord);
+		float Coord = UV.y * 2.0f - 1.0f;
+		Coord *= Coord;
+		ViewZenithAngle = ZenithHorizonAngle + Beta * Coord;
 	}
+	float CosViewZenithAngle = cos(ViewZenithAngle);
+	float SinViewZenithAngle = sqrt(1.0 - CosViewZenithAngle * CosViewZenithAngle) * (ViewZenithAngle > 0.0f ? 1.0f : -1.0f); // Equivalent to sin(ViewZenithAngle)
 
-	float coord = uv.x;
-	#if NONLINEARSKYVIEWLUT
-	coord *= coord;
-	#endif
-	lightViewCosAngle = -(coord*2.0 - 1.0);
+	float LongitudeViewCosAngle = UV.x * 2.0f * PI;
+
+	// Make sure those values are in range as it could disrupt other math done later such as sqrt(1.0-c*c)
+	float CosLongitudeViewCosAngle = cos(LongitudeViewCosAngle);
+	float SinLongitudeViewCosAngle = sqrt(1.0 - CosLongitudeViewCosAngle * CosLongitudeViewCosAngle) * (LongitudeViewCosAngle <= PI ? 1.0f : -1.0f); // Equivalent to sin(LongitudeViewCosAngle)
+	ViewDir = float3(
+		SinViewZenithAngle * CosLongitudeViewCosAngle,
+		SinViewZenithAngle * SinLongitudeViewCosAngle,
+		CosViewZenithAngle
+		);
 }
+
+//
+// void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float viewZenithCosAngle, out float lightViewCosAngle, in float viewHeight, in float2 uv)
+// {
+// 	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
+// 	uv = float2(fromSubUvsToUnit(uv.x, 96.0f), fromSubUvsToUnit(uv.y, 104.0f));
+//
+// 	float Vhorizon = sqrt(viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
+// 	float CosBeta = Vhorizon / viewHeight;				// GroundToHorizonCos
+// 	float Beta = acos(CosBeta);
+// 	float ZenithHorizonAngle = PI - Beta;
+//
+// 	if (uv.y < 0.5f)
+// 	{
+// 		float coord = 2.0*uv.y;
+// 		coord = 1.0 - coord;
+// #if NONLINEARSKYVIEWLUT
+// 		coord *= coord;
+// #endif
+// 		coord = 1.0 - coord;
+// 		viewZenithCosAngle = cos(ZenithHorizonAngle * coord);
+// 	}
+// 	else
+// 	{
+// 		float coord = uv.y*2.0 - 1.0;
+// #if NONLINEARSKYVIEWLUT
+// 		coord *= coord;
+// #endif
+// 		viewZenithCosAngle = cos(ZenithHorizonAngle + Beta * coord);
+// 	}
+//
+// 	float coord = uv.x;
+// 	#if NONLINEARSKYVIEWLUT
+// 	coord *= coord;
+// 	#endif
+// 	lightViewCosAngle = -(coord*2.0 - 1.0);
+// }
 
 void SkyViewLutParamsToUv(AtmosphereParameters Atmosphere, bool IntersectGround, in float viewZenithCosAngle, in float lightViewCosAngle, in float viewHeight, out float2 uv)
 {
@@ -174,7 +206,7 @@ void SkyViewLutParamsToUv(AtmosphereParameters Atmosphere, bool IntersectGround,
 	}
 
 	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
-	uv = float2(fromUnitToSubUvs(uv.x, 192.0f), fromUnitToSubUvs(uv.y, 108.0f));
+	uv = float2(fromUnitToSubUvs(uv.x, 96.0f), fromUnitToSubUvs(uv.y, 104.0f));
 }
 
 
@@ -406,31 +438,3 @@ float3 GetMultipleScattering(AtmosphereParameters Atmosphere, float3 scattering,
 	float3 multiScatteredLuminance = MultiScatTexture.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 	return multiScatteredLuminance;
 }
-
-/* Shadow
-
-#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
-#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
-
-real SampleShadowMap(float3 positionWS)
-{
-	float4 shadowCoords = TransformWorldToShadowCoord(positionWS*1000);
-	return MainLightRealtimeShadow(shadowCoords);
-}
-
-float getShadow(in AtmosphereParameters Atmosphere, float3 P)
-{
-	// First evaluate opaque shadow
-	// float4 shadowUv = mul(gShadowmapViewProjMat, float4(P + float3(0.0, -Atmosphere.BottomRadius, 0.0), 1.0));
-	// //shadowUv /= shadowUv.w;	// not be needed as it is an ortho projection
-	// shadowUv.x = shadowUv.x*0.5 + 0.5;
-	// shadowUv.y = -shadowUv.y*0.5 + 0.5;
-	// if (all(shadowUv.xyz >= 0.0) && all(shadowUv.xyz < 1.0))
-	// {
-	// 	return ShadowmapTexture.SampleCmpLevelZero(samplerShadow, shadowUv.xy, shadowUv.z);
-	// }
-	return SampleShadowMap(P+ float3(0.0, -Atmosphere.BottomRadius, 0.0));
-	// return SampleShadowMap(P);
-}
-
-*/
