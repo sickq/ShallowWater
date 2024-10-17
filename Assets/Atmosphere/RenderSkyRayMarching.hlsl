@@ -337,13 +337,16 @@ void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
 
     float cosSunZenithAngle = uv.x * 2.0 - 1.0;
     // float3 sunDir = float3(sqrt(saturate(1.0 - cosSunZenithAngle * cosSunZenithAngle)), cosSunZenithAngle, 0.0);
-    float3 sunDir = float3(0.0, cosSunZenithAngle, sqrt(saturate(1.0 - cosSunZenithAngle * cosSunZenithAngle)));
+    float3 sunDir = float3(0.0, sqrt(saturate(1.0 - cosSunZenithAngle * cosSunZenithAngle)), cosSunZenithAngle);
     // We adjust again viewHeight according to PLANET_RADIUS_OFFSET to be in a valid range.
     float viewHeight = Atmosphere.BottomRadius + saturate(uv.y + PLANET_RADIUS_OFFSET) * (Atmosphere.TopRadius -
         Atmosphere.BottomRadius - PLANET_RADIUS_OFFSET);
 
-    float3 WorldPos = float3(0.0f, viewHeight, 0.0f);
-    float3 WorldDir = float3(0.0f, 1.0f, 0.0f);
+    // float3 WorldPos = float3(0.0f, viewHeight, 0.0f);
+    // float3 WorldDir = float3(0.0f, 1.0f, 0.0f);
+
+    float3 WorldPos = float3(0.0f, 0.0f, viewHeight);
+    float3 WorldDir = float3(0.0f, 0.0f, 1.0f);
 
 
     const bool ground = true;

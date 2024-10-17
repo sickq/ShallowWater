@@ -115,7 +115,6 @@ void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float viewZenithC
 	float Beta = acos(CosBeta);
 	float ZenithHorizonAngle = PI - Beta;
 
-
 	if (uv.y < 0.5f)
 	{
 		float coord = 2.0*uv.y;

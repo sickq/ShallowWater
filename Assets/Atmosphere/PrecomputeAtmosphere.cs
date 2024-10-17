@@ -104,9 +104,13 @@ namespace Atmosphere
             cb.gSkyInvProjMat = projectionMatrix.inverse;
             cb.gSkyInvViewMat = camera.worldToCameraMatrix.inverse;
             cb.gShadowmapViewProjMat = viewProjMat;
-            cb.camera = camera.transform.position * scale;
-            cb.view_ray = -camera.transform.forward;
-            cb.sun_direction = -mainLight.transform.forward;
+            // cb.camera = camera.transform.position * scale;
+            cb.camera = new Vector3(camera.transform.position.x, camera.transform.position.z, camera.transform.position.y) * scale;
+            // cb.view_ray = -camera.transform.forward;
+            cb.sun_direction = new Vector3(-camera.transform.forward.x, -camera.transform.forward.z, -camera.transform.forward.y);
+
+            // cb.sun_direction = -mainLight.transform.forward;
+            cb.sun_direction = new Vector3(-mainLight.transform.forward.x, -mainLight.transform.forward.z, -mainLight.transform.forward.y);
 
             mConstantBufferCPU.gViewProjMat = viewProjMat;
             mConstantBufferCPU.gColor = new Vector4(0.0f, 1.0f, 1.0f, 1.0f);

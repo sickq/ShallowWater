@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentMultipleScatteringFactor: 1
   mie_phase_function_g: 0.675
-  mSunIlluminanceScale: 1
+  mSunIlluminanceScale: 4
   EarthRayleighScaleHeight: 8
   EarthMieScaleHeight: 0.88
   MieFadeBegin: 0
