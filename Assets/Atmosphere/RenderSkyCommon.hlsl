@@ -43,7 +43,7 @@ RWTexture2D<float4>  OutputTexture1						: register(u1);
 #endif
 
 
-#define PLANET_RADIUS_OFFSET 0.0f
+#define PLANET_RADIUS_OFFSET 0.001f
 
 struct Ray
 {

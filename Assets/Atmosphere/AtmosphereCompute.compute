@@ -32,37 +32,70 @@ void IntergalTransmittanceLUT(uint3 id: SV_DispatchThreadID)
     const float DepthBufferValue = -1.0;
     const bool VariableSampleCount = false;
     const bool MieRayPhase = false;
-    float3 transmittance = exp(-IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sun_direction, Atmosphere,
+    float3 transmittance = exp(-IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sun_direction, gSunIlluminance, Atmosphere,
                                                             ground, SampleCountIni, DepthBufferValue,
                                                             VariableSampleCount, MieRayPhase).OpticalDepth);
 
     _TransmittanceLUT[id.xy] = float4(transmittance, 1.0f);
 }
 
-[numthreads(8, 8, 1)]
+[numthreads(16, 4, 1)]
 void IntergalCameraVolumeLUT(uint3 id: SV_DispatchThreadID)
 {
-    float2 pixPos = id.xy + 0.5f;
-    float w, h, d;
-    _CameraVolumeLUT.GetDimensions(w, h, d);
     AtmosphereParameters Atmosphere = GetAtmosphereParameters();
-    float2 uv = pixPos / float2(w, h);
-    float3 ClipSpace = float3(uv * float2(2.0, -2.0) - float2(1.0, -1.0), 0.5);
-    float4 HViewPos = mul(gSkyInvProjMat, float4(ClipSpace, 1.0));
-    float3 WorldDir = normalize(mul((float3x3)gSkyInvViewMat, HViewPos.xyz / HViewPos.w));
-    
-    WorldDir = float3(WorldDir.x, WorldDir.z, WorldDir.y);
 
-    float earthR = Atmosphere.BottomRadius;
-    float3 camPos = camera + float3(0, 0, earthR);
+    float3 pixPos = id.xyz + 0.5f;
+    float3 pixPosUV = pixPos * CameraAerialPerspectiveVolumeParam3.yzw;
+    float2 uv = pixPosUV.xy;
+    
+    float2 yz = pixPosUV.yz * pixPosUV.yz;
+    yz = yz * CameraAerialPerspectiveVolumeParam.xy - float2(CameraAerialPerspectiveVolumeParam.w, 0);
+    float yzLength = sqrt(dot(yz, yz));
+
+    float yzLengthOffset = yzLength - CameraAerialPerspectiveVolumeParam3.x;
+    if(yzLengthOffset <= 0)
+    {
+        _CameraVolumeLUT[id] = float4(0, 0, 0, 0);
+        return;
+    }
+
+    float3 WorldPos = float3(0, 0, Atmosphere.BottomRadius + CameraAerialPerspectiveVolumeParam.w);
+    
+    float weight = 1 - saturate(-uv.y);
+
+    float4 worldDirTemp = 0;
+    float aaa = pixPosUV.x * pixPosUV.x * PI + CameraAerialPerspectiveVolumeParam2.z;
+    float sinValue = sin(aaa);
+    float cosValue = cos(aaa);
+
+    worldDirTemp.zw = yz / yzLength;
+    worldDirTemp.x = cosValue * worldDirTemp.w;
+    worldDirTemp.y = sinValue * worldDirTemp.w;
+    
+    float3 WorldDir = worldDirTemp.xyz;
+
     float3 SunDir = sun_direction;
+
+    float offset = worldDirTemp.z <= 0 ? 1.0f : 0.0f;
+    offset = offset * CameraAerialPerspectiveVolumeParam3.x;
+    WorldPos = offset * worldDirTemp + WorldPos;
     
     float Slice = ((id.z + 0.5f) / AP_SLICE_COUNT);
     Slice *= Slice; // squared distribution
     Slice *= AP_SLICE_COUNT;
 
-    float3 WorldPos = camPos;
+    float2 indexYZ = id.zy;
+    
+    // float abc = -indexYZ.y * AerialVolumeSampleCountParam.x + AerialVolumeSampleCountParam.y;
+    float abc = floor(-indexYZ.y * 0.25f + 3.0f);
+    abc = min(abc, 3.0f);
+    abc = abc + indexYZ.x + 1.0;
+    abc = abc + abc;
+    abc = max(abc, 1.0f);
 
+    float tempValue = yzLengthOffset / abc;
+    
+    
     // Compute position from froxel information
     float tMax = AerialPerspectiveSliceToDepth(Slice);
     float3 newWorldPos = WorldPos + tMax * WorldDir;
@@ -73,8 +106,8 @@ void IntergalCameraVolumeLUT(uint3 id: SV_DispatchThreadID)
     {
         // Apply a position offset to make sure no artefact are visible close to the earth boundaries for large voxel.
         newWorldPos = normalize(newWorldPos) * (Atmosphere.BottomRadius + PLANET_RADIUS_OFFSET + 0.001f);
-        WorldDir = normalize(newWorldPos - camPos);
-        tMax = length(newWorldPos - camPos);
+        WorldDir = normalize(newWorldPos - WorldPos);
+        tMax = length(newWorldPos - WorldPos);
     }
     float tMaxMax = tMax;
 
@@ -83,7 +116,7 @@ void IntergalCameraVolumeLUT(uint3 id: SV_DispatchThreadID)
     const float DepthBufferValue = -1.0;
     const bool VariableSampleCount = false;
     const bool MieRayPhase = true;
-    SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, Atmosphere, ground,
+    SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, gSunIlluminance, Atmosphere, ground,
                                                             SampleCountIni, DepthBufferValue, VariableSampleCount,
                                                             MieRayPhase, tMaxMax);
 
@@ -98,26 +131,34 @@ void IntergalSkyViewLutPS(uint3 id: SV_DispatchThreadID)
     float2 pixPos = id.xy + 0.5f;
     AtmosphereParameters Atmosphere = GetAtmosphereParameters();
 
-    float3 WorldPos = camera + float3(0, 0, Atmosphere.BottomRadius);
-    // float3 WorldPos = float3(0, 0, Atmosphere.BottomRadius + camera.z);
+    // float3 WorldPos = camera + float3(0, 0, Atmosphere.BottomRadius);
+    float3 WorldPos = float3(0, 0, Atmosphere.BottomRadius + CameraAerialPerspectiveVolumeParam.w);
     // float2 uv = pixPos / float2(192.0, 108.0);
     float2 uv = pixPos / float2(96.0, 104.0);
     
+    uv.x = uv.x * 1.0105263;
+    uv.y = -uv.y * 2.01941752 + 1.0;
+
     float weight = 1 - saturate(-uv.y);
     
-    float3 WorldDir = 0;
+    float worldDirZ = max(uv.y, 0);
+    float3 worldDirTemp = 0;
+    worldDirTemp.z = worldDirZ;
+
+    float sinZ = sqrt(1 - worldDirZ * worldDirZ);
+
+    float aaa =  uv.x * uv.x * PI + CameraAerialPerspectiveVolumeParam2.z;
+    float sinValue = sin(aaa);
+    float cosValue = cos(aaa);
+
+    worldDirTemp.x = cosValue * sinZ;
+    worldDirTemp.y = sinValue * sinZ;
+    
+    float3 WorldDir = worldDirTemp;
 
     float viewHeight = length(WorldPos);
 
-    UvToSkyViewLutParams(Atmosphere, WorldDir, viewHeight, uv);
-
-    float3 SunDir;
-    {
-        float3 UpVector = WorldPos / viewHeight;
-        float sunZenithCosAngle = dot(UpVector, sun_direction);
-        // SunDir = normalize(float3(sqrt(1.0 - sunZenithCosAngle * sunZenithCosAngle), sunZenithCosAngle, 0.0));
-        SunDir = normalize(float3(sqrt(1.0 - sunZenithCosAngle * sunZenithCosAngle), 0.0, sunZenithCosAngle));
-    }
+    float3 SunDir = sun_direction;
     
     WorldPos = float3(0.0f, 0.0f, viewHeight);
 
@@ -134,7 +175,7 @@ void IntergalSkyViewLutPS(uint3 id: SV_DispatchThreadID)
     const float DepthBufferValue = -1.0;
     const bool VariableSampleCount = true;
     const bool MieRayPhase = true;
-    SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, Atmosphere, ground,
+    SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, gSunIlluminance, Atmosphere, ground,
                                                             SampleCountIni, DepthBufferValue, VariableSampleCount,
                                                             MieRayPhase);
      _SkyViewLUT[id.xy] = ss.L * weight;

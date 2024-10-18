@@ -121,6 +121,12 @@
         public int SCATTERING_TEXTURE_MU_S_SIZE;
         public int SCATTERING_TEXTURE_NU_SIZE;
 
+        public Vector4 CameraAerialPerspectiveVolumeParam;
+        public Vector4 CameraAerialPerspectiveVolumeParam2;
+        public Vector4 CameraAerialPerspectiveVolumeParam3;
+
+        public Vector4 AerialVolumeSampleCountParam;
+        
         //
         // Other globals
         //
@@ -151,5 +157,9 @@
 
         public const int IRRADIANCE_TEXTURE_WIDTH = 64;
         public const int IRRADIANCE_TEXTURE_HEIGHT = 16;
+
+        public const int CAMERA_VOLUME_SIZE_X = 16;
+        public const int CAMERA_VOLUME_SIZE_Y = 16;
+        public const int CAMERA_VOLUME_SIZE_Z = 8;
     }
 }

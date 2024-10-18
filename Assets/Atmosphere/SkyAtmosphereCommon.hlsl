@@ -60,6 +60,10 @@ cbuffer SKYATMOSPHERE_BUFFER : register(b1)
 	int SCATTERING_TEXTURE_MU_S_SIZE;
 	int SCATTERING_TEXTURE_NU_SIZE;
 
+	float4 CameraAerialPerspectiveVolumeParam;
+	float4 CameraAerialPerspectiveVolumeParam2;
+	float4 CameraAerialPerspectiveVolumeParam3;
+	
 	//
 	// Other globals
 	//
@@ -118,6 +122,8 @@ struct AtmosphereParameters
 
 	// The albedo of the ground.
 	float3 GroundAlbedo;
+
+	float3 OneIlluminance;
 };
 
 AtmosphereParameters GetAtmosphereParameters()
@@ -132,7 +138,7 @@ AtmosphereParameters GetAtmosphereParameters()
 	Parameters.MieDensity = MieDensity;
 	Parameters.RayleighDensity = RayleighDensity;
 
-	
+	Parameters.OneIlluminance = float3(1.0f, 1.0f, 1.0f);
 	
 	Parameters.AbsorptionDensity0LayerWidth = AbsorptionDensity0LayerWidth;
 	Parameters.AbsorptionDensity0ConstantTerm = AbsorptionDensity0ConstantTerm;
@@ -214,10 +220,6 @@ void LutTransmittanceParamsToUv(AtmosphereParameters Atmosphere, in float viewHe
 // This is (0.01km/6420km).
 #define PLANET_RADIUS_RATIO_SAFE_EDGE 1.00000155763f
 
-
-// The number of killometer per slice in the aerial pespective camera volume texture. (assuming a uniform depth distribution)
-#define AP_KM_PER_SLICE 4.0f
-#define AP_KM_PER_SLICE_INV (1.0f / AP_KM_PER_SLICE)
 
 float3 GetTranslatedCameraPlanetPos()
 {

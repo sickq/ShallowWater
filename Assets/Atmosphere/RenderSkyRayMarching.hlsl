@@ -19,7 +19,7 @@ struct SingleScatteringResult
 };
 
 SingleScatteringResult IntegrateScatteredLuminance(
-    in float2 uvPos, in float3 WorldPos, in float3 WorldDir, in float3 SunDir, in AtmosphereParameters Atmosphere,
+    in float2 uvPos, in float3 WorldPos, in float3 WorldDir, in float3 SunDir, in float LightIlluminance, in AtmosphereParameters Atmosphere,
     in bool ground, in float SampleCountIni, in float DepthBufferValue, in bool VariableSampleCount,
     in bool MieRayPhase, in float tMaxMax = 9000000.0f)
 {
@@ -73,13 +73,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
     // mnegate cosTheta because due to WorldDir being a "in" direction. 
     float RayleighPhaseValue = RayleighPhase(cosTheta);
 
-    #ifdef ILLUMINANCE_IS_ONE
-	// When building the scattering factor, we assume light illuminance is 1 to compute a transfert function relative to identity illuminance of 1.
-	// This make the scattering factor independent of the light. It is now only linked to the atmosphere properties.
-	float3 globalL = 1.0f;
-    #else
-    float3 globalL = gSunIlluminance;
-    #endif
+    float3 globalL = LightIlluminance;
 
     // Ray march the atmosphere to integrate optical depth
     float3 L = 0.0f;
@@ -122,16 +116,6 @@ SingleScatteringResult IntegrateScatteredLuminance(
             t = NewT;
         }
         float3 P = WorldPos + t * WorldDir;
-
-        #if DEBUGENABLED
-		if (debugEnabled)
-		{
-			float3 Pprev = WorldPos + tPrev * WorldDir;
-			float3 TxToDebugWorld = float3(0, 0, -Atmosphere.BottomRadius);
-			addGpuDebugLine(TxToDebugWorld + Pprev, TxToDebugWorld + P, float3(0.2, 1, 0.2));
-			addGpuDebugCross(TxToDebugWorld + P, float3(0.2, 0.2, 1.0), 0.2);
-		}
-        #endif
 
         MediumSampleRGB medium = sampleMediumRGB(P, Atmosphere);
         const float3 SampleOpticalDepth = medium.extinction * dt;
@@ -212,8 +196,9 @@ SingleScatteringResult IntegrateScatteredLuminance(
 		L += throughput * S * dt;
 		throughput *= SampleTransmittance;
         #else
-        // See slide 28 at http://www.frostbite.com/2015/08/physically-based-unified-volumetric-rendering-in-frostbite/ 
-        float3 Sint = (S - S * SampleTransmittance) / medium.extinction; // integrate along the current step segment 
+        // See slide 28 at http://www.frostbite.com/2015/08/physically-based-unified-volumetric-rendering-in-frostbite/
+        float3 extinctionTemp = max(0.0000001f, medium.extinction);
+        float3 Sint = (S - S * SampleTransmittance) / extinctionTemp; // integrate along the current step segment 
         L += throughput * Sint; // accumulate and also take into account the transmittance from previous steps
         throughput *= SampleTransmittance;
         #endif
@@ -249,8 +234,8 @@ SingleScatteringResult IntegrateScatteredLuminance(
 ////////////////////////////////////////////////////////////////////////////////
 
 
-#define AP_SLICE_COUNT 64.0f
-#define AP_KM_PER_SLICE 0.2f
+#define AP_SLICE_COUNT 8.0f
+#define AP_KM_PER_SLICE 3.75f
 
 float AerialPerspectiveDepthToSlice(float depth)
 {
@@ -262,22 +247,10 @@ float AerialPerspectiveSliceToDepth(float slice)
     return slice * AP_KM_PER_SLICE;
 }
 
-struct RayMarchPixelOutputStruct
-{
-    float4 Luminance : SV_TARGET0;
-    #if COLORED_TRANSMITTANCE_ENABLED
-	float4 Transmittance	: SV_TARGET1;
-    #endif
-};
-
-
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
-
-groupshared float3 MultiScatAs1SharedMem[64];
-groupshared float3 LSharedMem[64];
 
 [numthreads(8, 8, 1)]
 void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
@@ -308,89 +281,16 @@ void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
     const float SphereSolidAngle = 4.0 * PI;
     const float IsotropicPhase = 1.0 / SphereSolidAngle;
 
+    SingleScatteringResult r0 = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sunDir, 1, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
+    SingleScatteringResult r1 = IntegrateScatteredLuminance(uv, WorldPos, -WorldDir, sunDir, 1, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
+        // SingleScatteringResult r1 = IntegrateScatteredLuminance(uv, WorldPos, -WorldDir, Ground, Sampling, DeviceZ, MieRayPhase,
+        //     LightDir, NullLightDirection, OneIlluminance, NullLightIlluminance, AerialPespectiveViewDistanceScale);
 
-    // Reference. Since there are many sample, it requires MULTI_SCATTERING_POWER_SERIE to be true for accuracy and to avoid divergences (see declaration for explanations)
-    #define SQRTSAMPLECOUNT 1
-    const float sqrtSample = float(SQRTSAMPLECOUNT);
-    float i = 0.5f + float(ThreadId.z / SQRTSAMPLECOUNT);
-    float j = 0.5f + float(ThreadId.z - float((ThreadId.z / SQRTSAMPLECOUNT) * SQRTSAMPLECOUNT));
-    {
-        float randA = i / sqrtSample;
-        float randB = j / sqrtSample;
-        float theta = 2.0f * PI * randA;
-        float phi = acos(1.0f - 2.0f * randB);
-        // uniform distribution https://mathworld.wolfram.com/SpherePointPicking.html
-        //phi = PI * randB;						// bad non uniform
-        float cosPhi = cos(phi);
-        float sinPhi = sin(phi);
-        float cosTheta = cos(theta);
-        float sinTheta = sin(theta);
-        WorldDir.x = cosTheta * sinPhi;
-        WorldDir.y = sinTheta * sinPhi;
-        WorldDir.z = cosPhi;
-        SingleScatteringResult result = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sunDir, Atmosphere,
-                                                                    ground, SampleCountIni, DepthBufferValue,
-                                                                    VariableSampleCount, MieRayPhase);
+    float3 IntegratedIlluminance = (SphereSolidAngle / 2.0f) * (r0.L + r1.L);
+    float3 MultiScatAs1 = (1.0f / 2.0f)*(r0.MultiScatAs1 + r1.MultiScatAs1);
+    float3 InScatteredLuminance = IntegratedIlluminance * IsotropicPhase;
 
-        OutputTexture[ThreadId.xy] = float4(MultipleScatteringFactor * result.L, 1.0f);
-        return;
-    }
-    #undef SQRTSAMPLECOUNT
-
-    GroupMemoryBarrierWithGroupSync();
-
-    // 64 to 32
-    if (ThreadId.z < 32)
-    {
-        MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 32];
-        LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 32];
-    }
-    GroupMemoryBarrierWithGroupSync();
-
-    // 32 to 16
-    if (ThreadId.z < 16)
-    {
-        MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 16];
-        LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 16];
-    }
-    GroupMemoryBarrierWithGroupSync();
-
-    // 16 to 8 (16 is thread group min hardware size with intel, no sync required from there)
-    if (ThreadId.z < 8)
-    {
-        MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 8];
-        LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 8];
-    }
-    GroupMemoryBarrierWithGroupSync();
-    if (ThreadId.z < 4)
-    {
-        MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 4];
-        LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 4];
-    }
-    GroupMemoryBarrierWithGroupSync();
-    if (ThreadId.z < 2)
-    {
-        MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 2];
-        LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 2];
-    }
-    GroupMemoryBarrierWithGroupSync();
-    if (ThreadId.z < 1)
-    {
-        MultiScatAs1SharedMem[ThreadId.z] += MultiScatAs1SharedMem[ThreadId.z + 1];
-        LSharedMem[ThreadId.z] += LSharedMem[ThreadId.z + 1];
-    }
-    GroupMemoryBarrierWithGroupSync();
-    if (ThreadId.z > 0)
-        return;
-
-    float3 MultiScatAs1 = MultiScatAs1SharedMem[0] * IsotropicPhase; // Equation 7 f_ms
-    float3 InScatteredLuminance = LSharedMem[0] * IsotropicPhase; // Equation 5 L_2ndOrder
-
-    // MultiScatAs1 represents the amount of luminance scattered as if the integral of scattered luminance over the sphere would be 1.
-    //  - 1st order of scattering: one can ray-march a straight path as usual over the sphere. That is InScatteredLuminance.
-    //  - 2nd order of scattering: the inscattered luminance is InScatteredLuminance at each of samples of fist order integration. Assuming a uniform phase function that is represented by MultiScatAs1,
-    //  - 3nd order of scattering: the inscattered luminance is (InScatteredLuminance * MultiScatAs1 * MultiScatAs1)
-    //  - etc.
+    
     #if	MULTI_SCATTERING_POWER_SERIE==0
 	float3 MultiScatAs1SQR = MultiScatAs1 * MultiScatAs1;
 	float3 L = InScatteredLuminance * (1.0 + MultiScatAs1 + MultiScatAs1SQR + MultiScatAs1 * MultiScatAs1SQR + MultiScatAs1SQR * MultiScatAs1SQR);
@@ -401,5 +301,5 @@ void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
     float3 L = InScatteredLuminance * SumOfAllMultiScatteringEventsContribution; // Equation 10 Psi_ms
     #endif
 
-    OutputTexture[ThreadId.xy] = float4(MultipleScatteringFactor * L, 1.0f);
+    OutputTexture[ThreadId.xy] = float4(MultipleScatteringFactor * L, MultipleScatteringFactor * L.x);
 }

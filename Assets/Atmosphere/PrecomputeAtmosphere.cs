@@ -12,9 +12,16 @@ namespace Atmosphere
         private float scale = 0.001f;
         public bool currentMultiscatapprox = true;
 
+        //TODO 替换成SkySunLight
         public Light mainLight;
         public ComputeShader computeShader;
         public AtmosphereData atmosphereData;
+
+        public float VolumeOffset = 0.1f;
+        public float CameraHeightOffset = 0.15f;
+
+        public float VolumeHeight = 9.0f;
+        public float VolumeDepth = 30.0f;
 
         private ComputeBuffer constantBuffer;
 
@@ -82,6 +89,15 @@ namespace Atmosphere
             // cb.SKY_SPECTRAL_RADIANCE_TO_LUMINANCE = new Vector3(114974.916437f, 71305.954816f, 65310.548555f);
             // cb.SUN_SPECTRAL_RADIANCE_TO_LUMINANCE = new Vector3(98242.786222f, 69954.398112f, 66475.012354f);
 
+            // cb.CameraAerialPerspectiveVolumeParam = LookUpTablesInfo.SCATTERING_TEXTURE_NU_SIZE;
+            cb.CameraAerialPerspectiveVolumeParam = new Vector4(VolumeHeight, VolumeDepth, 1.0f, CameraHeightOffset);
+            GameObject go = new GameObject();
+            go.transform.forward = -mainLight.transform.forward;
+            float rotateRad = -mainLight.transform.rotation.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
+            GameObject.Destroy(go);
+            cb.CameraAerialPerspectiveVolumeParam2 = new Vector4(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, rotateRad, 0.0f);
+            cb.CameraAerialPerspectiveVolumeParam3 = new Vector4(VolumeOffset, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
+            
             //深度值，渲染到纹理。Y要翻转
             var projectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
             Matrix4x4 viewProjMat = projectionMatrix * camera.worldToCameraMatrix;
@@ -134,8 +150,7 @@ namespace Atmosphere
 
         private void PrecomputeMuliScattLUT()
         {
-            Vector2Int size = new Vector2Int(LookUpTablesInfo.SCATTERING_TEXTURE_R_SIZE,
-                LookUpTablesInfo.SCATTERING_TEXTURE_R_SIZE);
+            Vector2Int size = new Vector2Int(atmosphereData.MultiScatteringLUTRes, atmosphereData.MultiScatteringLUTRes);
             Common.CheckOrCreateLUT(ref _newMuliScattLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("NewMultiScattCS");
             computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
@@ -158,7 +173,8 @@ namespace Atmosphere
         void PrecomputeCameraVolumeWithRayMarch()
         {
             Vector2Int size = Vector2Int.one * 64;
-            Common.CheckOrCreateLUT(ref _cameraVolumeLUT, size, RenderTextureFormat.ARGBHalf, size.x);
+            size = new Vector2Int(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y);
+            Common.CheckOrCreateLUT(ref _cameraVolumeLUT, size, RenderTextureFormat.ARGBHalf, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
             int index = computeShader.FindKernel("IntergalCameraVolumeLUT");
             computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
             computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);

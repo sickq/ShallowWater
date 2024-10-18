@@ -14,13 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentMultipleScatteringFactor: 1
   mie_phase_function_g: 0.85
-  mSunIlluminanceScale: 4.4
-  EarthRayleighScaleHeight: 7.75
-  EarthMieScaleHeight: 1.4714389
+  mSunIlluminanceScale: 4
+  EarthRayleighScaleHeight: 7.3
+  EarthMieScaleHeight: 0.3
   MieFadeBegin: 0
   EarthBottomRadius: 6360
   PlanetRadius: 6360
-  AtmosphereHeight: 60
+  AtmosphereHeight: 91.6
   MieExtinctionColor: {r: 0.35055, g: 0.20272, b: 0.21735, a: 1}
   MieExtinctionLength: 1
   MieScatteringColor: {r: 0.20755, g: 0.05972, b: 0.07435, a: 1}
