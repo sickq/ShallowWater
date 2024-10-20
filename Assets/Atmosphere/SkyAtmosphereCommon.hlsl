@@ -208,21 +208,3 @@ void LutTransmittanceParamsToUv(AtmosphereParameters Atmosphere, in float viewHe
 	uv = float2(x_mu, x_r);
 	//uv = float2(fromUnitToSubUvs(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromUnitToSubUvs(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT)); // No real impact so off
 }
-
-// The constants below should match the one in SceneRendering.cpp
-// Kilometers as unit for computations related to the sky and its atmosphere
-#define M_TO_SKY_UNIT 0.001f
-#define SKY_UNIT_TO_M (1.0f/M_TO_SKY_UNIT)
-// Float accuracy offset in Sky unit (km, so this is 1m). Should match the one in FAtmosphereSetup::ComputeViewData
-#define PLANET_RADIUS_OFFSET 0.001f
-
-// Planet radius safe edge to make sure ray does intersect with the atmosphere, for it to traverse the atmosphere. Must match the one in FSceneRenderer::RenderSkyAtmosphereInternal.
-// This is (0.01km/6420km).
-#define PLANET_RADIUS_RATIO_SAFE_EDGE 1.00000155763f
-
-
-float3 GetTranslatedCameraPlanetPos()
-{
-	AtmosphereParameters atmosphere = GetAtmosphereParameters();
-	return (camera - float3(0, 0, atmosphere.BottomRadius)) * M_TO_SKY_UNIT;
-}

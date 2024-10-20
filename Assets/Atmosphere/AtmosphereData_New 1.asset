@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 46711063bc8c41f0a054159af05cc227, type: 3}
-  m_Name: AtmosphereData_New
+  m_Name: AtmosphereData_New 1
   m_EditorClassIdentifier: 
   currentMultipleScatteringFactor: 1
-  mie_phase_function_g: 0.675
-  mSunIlluminanceScale: 7.17
+  mie_phase_function_g: 0.867
+  mSunIlluminanceScale: 4.53
   EarthRayleighScaleHeight: 8
   EarthMieScaleHeight: 0.88
   MieFadeBegin: 0
@@ -29,7 +29,7 @@ MonoBehaviour:
   RayleighScatteringLength: 1
   AbsorptionExtinctionColor: {r: 0.0181, g: 0.00699, b: 0, a: 1}
   AbsorptionExtinctionLength: 1
-  GroundAlbedo: {r: 0.7433963, g: 0.7433963, b: 0.7433963, a: 1}
+  GroundAlbedo: {r: 0.74902, g: 0.74902, b: 0.74902, a: 1}
   AbsorptionDensity0LayerWidth: 25
   AbsorptionDensity0ConstantTerm: -0.66667
   AbsorptionDensity0LinearTerm: 0.06667

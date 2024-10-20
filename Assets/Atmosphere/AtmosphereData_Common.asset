@@ -10,26 +10,26 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 46711063bc8c41f0a054159af05cc227, type: 3}
-  m_Name: AtmosphereData_New
+  m_Name: AtmosphereData_Common
   m_EditorClassIdentifier: 
   currentMultipleScatteringFactor: 1
-  mie_phase_function_g: 0.675
-  mSunIlluminanceScale: 7.17
+  mie_phase_function_g: 0.8
+  mSunIlluminanceScale: 5.8
   EarthRayleighScaleHeight: 8
-  EarthMieScaleHeight: 0.88
+  EarthMieScaleHeight: 1.2
   MieFadeBegin: 0
   EarthBottomRadius: 6360
   PlanetRadius: 6360
-  AtmosphereHeight: 60
-  MieExtinctionColor: {r: 0.13895, g: 0.16984, b: 0.22245, a: 1}
+  AtmosphereHeight: 91.6
+  MieExtinctionColor: {r: 0.00444, g: 0.00444, b: 0.00444, a: 1}
   MieExtinctionLength: 1
-  MieScatteringColor: {r: 0.09116, g: 0.12205, b: 0.17466, a: 1}
+  MieScatteringColor: {r: 0.003996, g: 0.003996, b: 0.003996, a: 1}
   MieScatteringLength: 1
-  RayleighScatteringColor: {r: 0.00713, g: 0.0132, b: 0.02738, a: 1}
+  RayleighScatteringColor: {r: 0.005802, g: 0.013558, b: 0.0331, a: 1}
   RayleighScatteringLength: 1
-  AbsorptionExtinctionColor: {r: 0.0181, g: 0.00699, b: 0, a: 1}
+  AbsorptionExtinctionColor: {r: 0.00065, g: 0.001881, b: 0.000085, a: 1}
   AbsorptionExtinctionLength: 1
-  GroundAlbedo: {r: 0.7433963, g: 0.7433963, b: 0.7433963, a: 1}
+  GroundAlbedo: {r: 0.40198, g: 0.40198, b: 0.40198, a: 1}
   AbsorptionDensity0LayerWidth: 25
   AbsorptionDensity0ConstantTerm: -0.66667
   AbsorptionDensity0LinearTerm: 0.06667

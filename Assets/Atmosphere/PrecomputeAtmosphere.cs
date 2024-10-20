@@ -52,6 +52,10 @@ namespace Atmosphere
 
             PrecomputeSkyViewLUT();
             PrecomputeCameraVolumeWithRayMarch();
+            
+            Shader.SetGlobalTexture("_SkyViewLutTextureL", _skyViewLUT);
+            
+            Shader.SetGlobalVector("g_AtmosphereLightDirection", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, 0, 0));
         }
 
         void UpdateConstantBuffer(Camera camera)

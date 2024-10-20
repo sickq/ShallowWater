@@ -70,6 +70,7 @@ SingleScatteringResult IntegrateScatteredLuminance(
     const float3 wo = WorldDir;
     float cosTheta = dot(wi, wo);
     float MiePhaseValue = hgPhase(Atmosphere.MiePhaseG, -cosTheta);
+
     // mnegate cosTheta because due to WorldDir being a "in" direction. 
     float RayleighPhaseValue = RayleighPhase(cosTheta);
 
