@@ -321,11 +321,10 @@ float rangedTransmittanceIS(float extinction, float transmittance, float zeta)
 	return -log(1.0f - zeta * (1.0f - transmittance)) / extinction;
 }
 
-
-
 float RayleighPhase(float cosTheta)
 {
-	float factor = 3.0f / (16.0f * PI);
+	// float factor = 3.0f / (16.0f * PI);
+	float factor = 0.0596830994f;
 	return factor * (1.0f + cosTheta * cosTheta);
 }
 
@@ -346,6 +345,11 @@ float hgPhase(float g, float cosTheta)
 	float denom = 1.0f + g * g + 2.0f * g * cosTheta;
 	return numer / (4.0f * PI * denom * sqrt(denom));
 #endif
+}
+
+float hgPhaseSimple(float g, float k, float cosTheta)
+{
+	return k * (1.0 + cosTheta * cosTheta) / pow(1.0 + g * g - 2.0 * g * -cosTheta, 1.5);
 }
 
 float dualLobPhase(float g0, float g1, float w, float cosTheta)

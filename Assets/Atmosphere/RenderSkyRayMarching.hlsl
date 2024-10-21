@@ -21,7 +21,7 @@ struct SingleScatteringResult
 SingleScatteringResult IntegrateScatteredLuminance(
     in float2 uvPos, in float3 WorldPos, in float3 WorldDir, in float3 SunDir, in float LightIlluminance, in AtmosphereParameters Atmosphere,
     in bool ground, in float SampleCountIni, in float DepthBufferValue, in bool VariableSampleCount,
-    in bool MieRayPhase, in float tMaxMax = 9000000.0f)
+    in IntegrateScatteredParam IntegrateScattered, in float tMaxMax = 9000000.0f)
 {
     // const bool debugEnabled = all(uint2(pixPos.xx) == gMouseLastDownPos.xx) && uint(pixPos.y) % 10 == 0 && DepthBufferValue != -1.0f;
     SingleScatteringResult result = (SingleScatteringResult)0;
@@ -65,14 +65,8 @@ SingleScatteringResult IntegrateScatteredLuminance(
     float dt = tMax / SampleCount;
 
     // Phase functions
-    const float uniformPhase = 1.0 / (4.0 * PI);
-    const float3 wi = SunDir;
-    const float3 wo = WorldDir;
-    float cosTheta = dot(wi, wo);
-    float MiePhaseValue = hgPhase(Atmosphere.MiePhaseG, -cosTheta);
-
-    // mnegate cosTheta because due to WorldDir being a "in" direction. 
-    float RayleighPhaseValue = RayleighPhase(cosTheta);
+    // const float uniformPhase = 1.0 / (4.0 * PI);
+    const float uniformPhase = 0.079577472f;    // 1.0 / (4.0 * PI)
 
     float3 globalL = LightIlluminance;
 
@@ -131,9 +125,10 @@ SingleScatteringResult IntegrateScatteredLuminance(
         float3 TransmittanceToSun = TransmittanceLutTexture.SampleLevel(samplerLinearClamp, uv, 0).rgb;
 
         float3 PhaseTimesScattering;
-        if (MieRayPhase)
+        if (IntegrateScattered.MieRayPhase)
         {
-            PhaseTimesScattering = medium.scatteringMie * MiePhaseValue + medium.scatteringRay * RayleighPhaseValue;
+            // float mieWeight = WorldDir.z >= 0 ? 1.0f : 0.0f;
+            PhaseTimesScattering = medium.scatteringMie * IntegrateScattered.MiePhaseValue + medium.scatteringRay * IntegrateScattered.RayleighPhaseValue;
         }
         else
         {
@@ -282,8 +277,22 @@ void NewMultiScattCS(uint3 ThreadId : SV_DispatchThreadID)
     const float SphereSolidAngle = 4.0 * PI;
     const float IsotropicPhase = 1.0 / SphereSolidAngle;
 
-    SingleScatteringResult r0 = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sunDir, 1, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
-    SingleScatteringResult r1 = IntegrateScatteredLuminance(uv, WorldPos, -WorldDir, sunDir, 1, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, MieRayPhase);
+    // Phase functions
+    float cosTheta = dot(sunDir, WorldDir);
+    float MiePhaseValue = hgPhase(Atmosphere.MiePhaseG, -cosTheta);
+
+    // mnegate cosTheta because due to WorldDir being a "in" direction. 
+    float RayleighPhaseValue = RayleighPhase(cosTheta);
+    
+    IntegrateScatteredParam IntegrateScatteredParams = (IntegrateScatteredParam)0;
+    {
+        IntegrateScatteredParams.MieRayPhase = false;
+        IntegrateScatteredParams.MiePhaseValue = MiePhaseValue;
+        IntegrateScatteredParams.RayleighPhaseValue = RayleighPhaseValue;
+    }
+
+    SingleScatteringResult r0 = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sunDir, 1, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, IntegrateScatteredParams);
+    SingleScatteringResult r1 = IntegrateScatteredLuminance(uv, WorldPos, -WorldDir, sunDir, 1, Atmosphere, ground, SampleCountIni, DepthBufferValue, VariableSampleCount, IntegrateScatteredParams);
         // SingleScatteringResult r1 = IntegrateScatteredLuminance(uv, WorldPos, -WorldDir, Ground, Sampling, DeviceZ, MieRayPhase,
         //     LightDir, NullLightDirection, OneIlluminance, NullLightIlluminance, AerialPespectiveViewDistanceScale);
 

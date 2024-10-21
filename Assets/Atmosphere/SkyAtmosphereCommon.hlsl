@@ -2,7 +2,7 @@
 
 #define PI 3.1415926535897932384626433832795f
 
-#define mPositionScale 0.001
+#define UNIFORM_PHASE 0.079577472f    // 1.0 / (4.0 * PI)
 
 SamplerState samplerLinearClamp : register(s0);
 
@@ -63,6 +63,10 @@ cbuffer SKYATMOSPHERE_BUFFER : register(b1)
 	float4 CameraAerialPerspectiveVolumeParam;
 	float4 CameraAerialPerspectiveVolumeParam2;
 	float4 CameraAerialPerspectiveVolumeParam3;
+
+	float4 AtmosParam;
+	float4 AtmosParam1;
+	float4 AtmosParam2; 
 	
 	//
 	// Other globals
@@ -124,6 +128,13 @@ struct AtmosphereParameters
 	float3 GroundAlbedo;
 
 	float3 OneIlluminance;
+};
+
+struct IntegrateScatteredParam
+{
+	bool MieRayPhase;
+	float3 MiePhaseValue;
+	float3 RayleighPhaseValue;
 };
 
 AtmosphereParameters GetAtmosphereParameters()

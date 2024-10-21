@@ -27,14 +27,20 @@ void IntergalTransmittanceLUT(uint3 id: SV_DispatchThreadID)
     float3 WorldPos = float3(0.0f, 0.0f, viewHeight);
     float3 WorldDir = float3(0.0f, sqrt(1.0 - viewZenithCosAngle * viewZenithCosAngle), viewZenithCosAngle);
 
+    IntegrateScatteredParam IntegrateScatteredParams = (IntegrateScatteredParam)0;
+    {
+        IntegrateScatteredParams.MieRayPhase = false;
+        IntegrateScatteredParams.MiePhaseValue = 0;
+        IntegrateScatteredParams.RayleighPhaseValue = 1;
+    }
+    
     const bool ground = false;
     const float SampleCountIni = 10.0f; // Can go a low as 10 sample but energy lost starts to be visible.
     const float DepthBufferValue = -1.0;
     const bool VariableSampleCount = false;
-    const bool MieRayPhase = false;
     float3 transmittance = exp(-IntegrateScatteredLuminance(uv, WorldPos, WorldDir, sun_direction, gSunIlluminance, Atmosphere,
                                                             ground, SampleCountIni, DepthBufferValue,
-                                                            VariableSampleCount, MieRayPhase).OpticalDepth);
+                                                            VariableSampleCount, IntegrateScatteredParams).OpticalDepth);
 
     _TransmittanceLUT[id.xy] = float4(transmittance, 1.0f);
 }
@@ -61,8 +67,6 @@ void IntergalCameraVolumeLUT(uint3 id: SV_DispatchThreadID)
 
     float3 WorldPos = float3(0, 0, Atmosphere.BottomRadius + CameraAerialPerspectiveVolumeParam.w);
     
-    float weight = 1 - saturate(-uv.y);
-
     float4 worldDirTemp = 0;
     float aaa = pixPosUV.x * pixPosUV.x * PI + CameraAerialPerspectiveVolumeParam2.z;
     float sinValue = sin(aaa);
@@ -99,14 +103,39 @@ void IntergalCameraVolumeLUT(uint3 id: SV_DispatchThreadID)
     }
     float tMaxMax = tMax;
 
+    // Phase functions
+    float cosTheta = dot(SunDir, WorldDir);
+    float MiePhaseValue = hgPhaseSimple(Atmosphere.MiePhaseG, AtmosParam.z, -cosTheta);
+
+    float uniformMiePhase = MiePhaseValue;
+    
+    // mnegate cosTheta because due to WorldDir being a "in" direction. 
+    float RayleighPhaseValue = RayleighPhase(cosTheta);
+
+    float3 atmosColor = RayleighPhaseValue * AtmosParam2.xyz + uniformMiePhase * AtmosParam1.xyz;
+
+    float3 atmosColor1 = atmosColor - uniformMiePhase;
+    atmosColor1 = AtmosParam.y * atmosColor1 + uniformMiePhase;
+
+    float3 atmosColor2 = atmosColor - RayleighPhaseValue;
+    atmosColor2 = AtmosParam.y * atmosColor2 + RayleighPhaseValue;
+
+    IntegrateScatteredParam IntegrateScatteredParams = (IntegrateScatteredParam)0;
+    {
+        IntegrateScatteredParams.MieRayPhase = true;
+        // IntegrateScatteredParams.MiePhaseValue = MiePhaseValue;
+        // IntegrateScatteredParams.RayleighPhaseValue = RayleighPhaseValue;
+        IntegrateScatteredParams.MiePhaseValue = atmosColor1;
+        IntegrateScatteredParams.RayleighPhaseValue = atmosColor2;
+    }
+    
     const bool ground = true;
     const float SampleCountIni = max(1.0, float(id.z + 1.0) * 2.0f);
     const float DepthBufferValue = -1.0;
     const bool VariableSampleCount = false;
-    const bool MieRayPhase = true;
     SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, gSunIlluminance, Atmosphere, ground,
                                                             SampleCountIni, DepthBufferValue, VariableSampleCount,
-                                                            MieRayPhase, tMaxMax);
+                                                            IntegrateScatteredParams, tMaxMax);
 
 
     const float Transmittance = dot(ss.Transmittance, float3(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f));
@@ -158,13 +187,38 @@ void IntergalSkyViewLutPS(uint3 id: SV_DispatchThreadID)
         return;
     }
 
+    // Phase functions
+    float cosTheta = dot(SunDir, WorldDir);
+    float MiePhaseValue = hgPhaseSimple(Atmosphere.MiePhaseG, AtmosParam.z, -cosTheta);
+
+    float uniformMiePhase = MiePhaseValue;
+    
+    // mnegate cosTheta because due to WorldDir being a "in" direction. 
+    float RayleighPhaseValue = RayleighPhase(cosTheta);
+
+    float3 atmosColor = RayleighPhaseValue * AtmosParam2.xyz + uniformMiePhase * AtmosParam1.xyz;
+
+    float3 atmosColor1 = atmosColor - uniformMiePhase;
+    atmosColor1 = AtmosParam.y * atmosColor1 + uniformMiePhase;
+
+    float3 atmosColor2 = atmosColor - RayleighPhaseValue;
+    atmosColor2 = AtmosParam.y * atmosColor2 + RayleighPhaseValue;
+
+    IntegrateScatteredParam IntegrateScatteredParams = (IntegrateScatteredParam)0;
+    {
+        IntegrateScatteredParams.MieRayPhase = true;
+        // IntegrateScatteredParams.MiePhaseValue = MiePhaseValue;
+        // IntegrateScatteredParams.RayleighPhaseValue = RayleighPhaseValue;
+        IntegrateScatteredParams.MiePhaseValue = atmosColor1;
+        IntegrateScatteredParams.RayleighPhaseValue = atmosColor2;
+    }
+    
     const bool ground = true;
     const float SampleCountIni = 15;
     const float DepthBufferValue = -1.0;
     const bool VariableSampleCount = true;
-    const bool MieRayPhase = true;
     SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, gSunIlluminance, Atmosphere, ground,
                                                             SampleCountIni, DepthBufferValue, VariableSampleCount,
-                                                            MieRayPhase);
-     _SkyViewLUT[id.xy] = ss.L * weight;
+                                                            IntegrateScatteredParams);
+    _SkyViewLUT[id.xy] = ss.L * weight;
 }

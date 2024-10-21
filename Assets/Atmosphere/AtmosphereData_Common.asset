@@ -19,7 +19,6 @@ MonoBehaviour:
   EarthMieScaleHeight: 1.2
   MieFadeBegin: 0
   EarthBottomRadius: 6360
-  PlanetRadius: 6360
   AtmosphereHeight: 91.6
   MieExtinctionColor: {r: 0.00444, g: 0.00444, b: 0.00444, a: 1}
   MieExtinctionLength: 1
@@ -30,6 +29,9 @@ MonoBehaviour:
   AbsorptionExtinctionColor: {r: 0.00065, g: 0.001881, b: 0.000085, a: 1}
   AbsorptionExtinctionLength: 1
   GroundAlbedo: {r: 0.40198, g: 0.40198, b: 0.40198, a: 1}
+  AtmosphereColorOffsetWeight: 0
+  AtmosphereColor1: {r: 0.17012, g: 0.04081, b: 0.03251, a: 1}
+  AtmosphereColor2: {r: 0.82988, g: 0.95919, b: 0.96749, a: 1}
   AbsorptionDensity0LayerWidth: 25
   AbsorptionDensity0ConstantTerm: -0.66667
   AbsorptionDensity0LinearTerm: 0.06667

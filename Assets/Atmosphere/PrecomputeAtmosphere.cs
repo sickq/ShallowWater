@@ -101,6 +101,11 @@ namespace Atmosphere
             GameObject.Destroy(go);
             cb.CameraAerialPerspectiveVolumeParam2 = new Vector4(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, rotateRad, 0.0f);
             cb.CameraAerialPerspectiveVolumeParam3 = new Vector4(VolumeOffset, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
+
+
+            cb.AtmosParam = new Vector4(0.0f, atmosphereData.AtmosphereColorOffsetWeight, AtmosphereUtils.GetHgPhaseK(atmosphereData.mie_phase_function_g), 0.0f);
+            cb.AtmosParam1 = atmosphereData.AtmosphereColor1;
+            cb.AtmosParam2 = atmosphereData.AtmosphereColor2;
             
             //深度值，渲染到纹理。Y要翻转
             var projectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
