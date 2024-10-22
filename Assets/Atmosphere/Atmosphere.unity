@@ -38,6 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
+  m_IndirectSpecularColor: {r: 0.21582027, g: 0.21582027, b: 0.21582027, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -520,7 +521,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b9a305e18de0c04dbd257a21cd47087, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sharedProfile: {fileID: 11400000, guid: 6aacabd431ebb844883af11d5a0e2941, type: 2}
+  sharedProfile: {fileID: 11400000, guid: 4fad42ddad4b0af40855163359098e28, type: 2}
   isGlobal: 1
   blendDistance: 0
   weight: 1
@@ -916,7 +917,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c1be14efe3e446f4a849c25bb4b1ceed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentMultiscatapprox: 1
+  skyViewLUTType: 1
   mainLight: {fileID: 2144530143}
   computeShader: {fileID: 7200000, guid: 4fffa00caeba28a4abd4a377807f2522, type: 3}
   atmosphereData: {fileID: 11400000, guid: 9725819e4d714144bb653de64c75ca7f, type: 2}
@@ -1378,13 +1379,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2144530142}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.17513216, y: 0.7907937, z: -0.5234149, w: -0.26459587}
+  m_LocalRotation: {x: -0.2853268, y: 0.9565752, z: -0.056092124, w: 0.020155255}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 67, y: 217, z: 0}
+  m_LocalEulerAnglesHint: {x: 5.498, y: 175.935, z: -33.413}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

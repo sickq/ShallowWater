@@ -76,6 +76,11 @@ Ray createRay(in float3 p, in float3 d)
 float fromUnitToSubUvs(float u, float resolution) { return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f)); }
 float fromSubUvsToUnit(float u, float resolution) { return (u - 0.5f / resolution) * (resolution / (resolution - 1.0f)); }
 
+float2 fromUnitToSubUvs(float2 u, float2 resolution)
+{
+	return float2(fromUnitToSubUvs(u.x, resolution.x), fromUnitToSubUvs(u.y, resolution.y));
+}
+
 void UvToLutTransmittanceParams(AtmosphereParameters Atmosphere, out float viewHeight, out float viewZenithCosAngle, in float2 uv)
 {
 	//uv = float2(fromSubUvsToUnit(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromSubUvsToUnit(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT)); // No real impact so off
@@ -136,80 +141,38 @@ void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float3 ViewDir, i
 		);
 }
 
-//
-// void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float viewZenithCosAngle, out float lightViewCosAngle, in float viewHeight, in float2 uv)
-// {
-// 	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
-// 	uv = float2(fromSubUvsToUnit(uv.x, 96.0f), fromSubUvsToUnit(uv.y, 104.0f));
-//
-// 	float Vhorizon = sqrt(viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
-// 	float CosBeta = Vhorizon / viewHeight;				// GroundToHorizonCos
-// 	float Beta = acos(CosBeta);
-// 	float ZenithHorizonAngle = PI - Beta;
-//
-// 	if (uv.y < 0.5f)
-// 	{
-// 		float coord = 2.0*uv.y;
-// 		coord = 1.0 - coord;
-// #if NONLINEARSKYVIEWLUT
-// 		coord *= coord;
-// #endif
-// 		coord = 1.0 - coord;
-// 		viewZenithCosAngle = cos(ZenithHorizonAngle * coord);
-// 	}
-// 	else
-// 	{
-// 		float coord = uv.y*2.0 - 1.0;
-// #if NONLINEARSKYVIEWLUT
-// 		coord *= coord;
-// #endif
-// 		viewZenithCosAngle = cos(ZenithHorizonAngle + Beta * coord);
-// 	}
-//
-// 	float coord = uv.x;
-// 	#if NONLINEARSKYVIEWLUT
-// 	coord *= coord;
-// 	#endif
-// 	lightViewCosAngle = -(coord*2.0 - 1.0);
-// }
-
-void SkyViewLutParamsToUv(AtmosphereParameters Atmosphere, bool IntersectGround, in float viewZenithCosAngle, in float lightViewCosAngle, in float viewHeight, out float2 uv)
+void SkyViewLutParamsToUv(
+	in float IntersectGround, in float ViewZenithCosAngle, in float3 ViewDir, in float ViewHeight, in float BottomRadius, in float2 SkyViewLutSizeAndInvSize,
+	out float2 UV)
 {
-	float Vhorizon = sqrt(viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius);
-	float CosBeta = Vhorizon / viewHeight;				// GroundToHorizonCos
-	float Beta = acos(CosBeta);
+	float Vhorizon = sqrt(ViewHeight * ViewHeight - BottomRadius * BottomRadius);
+	float CosBeta = Vhorizon / ViewHeight;				// GroundToHorizonCos
+	float Beta = acosFast4(CosBeta);
 	float ZenithHorizonAngle = PI - Beta;
+	float ViewZenithAngle = acosFast4(ViewZenithCosAngle);
 
-	if (!IntersectGround)
+	if (IntersectGround >= 0)
 	{
-		float coord = acos(viewZenithCosAngle) / ZenithHorizonAngle;
-		coord = 1.0 - coord;
-#if NONLINEARSKYVIEWLUT
-		coord = sqrt(coord);
-#endif
-		coord = 1.0 - coord;
-		uv.y = coord * 0.5f;
+		float Coord = ViewZenithAngle / ZenithHorizonAngle;
+		Coord = 1.0f - Coord;
+		Coord = sqrt(Coord);
+		Coord = 1.0f - Coord;
+		UV.y = Coord * 0.5f;
 	}
 	else
 	{
-		float coord = (acos(viewZenithCosAngle) - ZenithHorizonAngle) / Beta;
-#if NONLINEARSKYVIEWLUT
-		coord = sqrt(coord);
-#endif
-		uv.y = coord * 0.5f + 0.5f;
+		float Coord = (ViewZenithAngle - ZenithHorizonAngle) / Beta;
+		Coord = sqrt(Coord);
+		UV.y = Coord * 0.5f + 0.5f;
 	}
 
 	{
-		float coord = -lightViewCosAngle * 0.5f + 0.5f;
-		coord = sqrt(coord);
-		uv.x = coord;
+		UV.x = (atan2Fast(-ViewDir.y, -ViewDir.x) + PI) / (2.0f * PI);
 	}
 
 	// Constrain uvs to valid sub texel range (avoid zenith derivative issue making LUT usage visible)
-	uv = float2(fromUnitToSubUvs(uv.x, 96.0f), fromUnitToSubUvs(uv.y, 104.0f));
+	UV = fromUnitToSubUvs(UV, SkyViewLutSizeAndInvSize);
 }
-
-
 
 ////////////////////////////////////////////////////////////
 // Participating media
@@ -418,10 +381,10 @@ bool MoveToTopAtmosphere(inout float3 WorldPos, in float3 WorldDir, in float Atm
 	return true; // ok to start tracing
 }
 
-float3 GetSunLuminance(float3 WorldPos, float3 WorldDir, float PlanetRadius)
+float3 GetSunLuminance(float3 WorldPos, float3 WorldDir, float3 sunDir, float PlanetRadius)
 {
 #if RENDER_SUN_DISK
-	if (dot(WorldDir, sun_direction) > cos(0.5*1.505*3.14159 / 180.0))
+	if (dot(WorldDir, sunDir) > cos(0.5*1.505*3.14159 / 180.0))
 	{
 		float t = raySphereIntersectNearest(WorldPos, WorldDir, float3(0.0f, 0.0f, 0.0f), PlanetRadius);
 		if (t < 0.0f) // no intersection

@@ -4,14 +4,21 @@ namespace Atmosphere
 {
     using UnityEngine;
 
+    public enum AtmosphereLUTType
+    {
+        Optimized,
+        UE,
+    }
+    
     public class PrecomputeAtmosphere : MonoBehaviour
     {
         private CommonConstantBufferStructure mConstantBufferCPU = new CommonConstantBufferStructure();
         private SkyAtmosphereConstantBufferStructure cb = new SkyAtmosphereConstantBufferStructure();
         private Material renderSkyMat;
         private float scale = 0.001f;
-        public bool currentMultiscatapprox = true;
 
+        public AtmosphereLUTType skyViewLUTType = AtmosphereLUTType.Optimized;
+        
         //TODO 替换成SkySunLight
         public Light mainLight;
         public ComputeShader computeShader;
@@ -39,23 +46,25 @@ namespace Atmosphere
         {
             UpdateConstantBuffer(Camera.main);
             PrecomputeTransmittanceLUT();
-            if (currentMultiscatapprox)
-            {
-                computeShader.DisableKeyword("MULTISCATAPPROX_ENABLED");
-                PrecomputeMuliScattLUT();
-                computeShader.EnableKeyword("MULTISCATAPPROX_ENABLED");
-            }
-            else
-            {
-                computeShader.DisableKeyword("MULTISCATAPPROX_ENABLED");
-            }
 
-            PrecomputeSkyViewLUT();
+            computeShader.DisableKeyword("MULTISCATAPPROX_ENABLED");
+            PrecomputeMuliScattLUT();
+            computeShader.EnableKeyword("MULTISCATAPPROX_ENABLED");
+
+            switch (skyViewLUTType)
+            {
+                case AtmosphereLUTType.Optimized:
+                    PrecomputeSkyViewLUT();
+                    break;
+                case AtmosphereLUTType.UE:
+                    PrecomputeSkyViewLUTUE();
+                    break;
+            }
+            
             PrecomputeCameraVolumeWithRayMarch();
             
             Shader.SetGlobalTexture("_SkyViewLutTextureL", _skyViewLUT);
-            
-            Shader.SetGlobalVector("g_AtmosphereLightDirection", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, 0, 0));
+            Shader.SetGlobalVector("g_AtmosphereLightDirection", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, mainLight.transform.forward.z, mainLight.transform.forward.y));
         }
 
         void UpdateConstantBuffer(Camera camera)
@@ -95,10 +104,14 @@ namespace Atmosphere
 
             // cb.CameraAerialPerspectiveVolumeParam = LookUpTablesInfo.SCATTERING_TEXTURE_NU_SIZE;
             cb.CameraAerialPerspectiveVolumeParam = new Vector4(VolumeHeight, VolumeDepth, 1.0f, CameraHeightOffset);
-            GameObject go = new GameObject();
-            go.transform.forward = -mainLight.transform.forward;
-            float rotateRad = -mainLight.transform.rotation.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
-            GameObject.Destroy(go);
+            // GameObject go = new GameObject();
+            // go.transform.forward = -mainLight.transform.forward;
+            // float rotateRad = -mainLight.transform.rotation.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
+            // GameObject.Destroy(go);
+            
+            Quaternion quaternion = Quaternion.LookRotation(-mainLight.transform.forward);
+            float rotateRad = -quaternion.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
+            
             cb.CameraAerialPerspectiveVolumeParam2 = new Vector4(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, rotateRad, 0.0f);
             cb.CameraAerialPerspectiveVolumeParam3 = new Vector4(VolumeOffset, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
 
@@ -119,15 +132,9 @@ namespace Atmosphere
             // cb.camera = camera.transform.position * scale;
             //兼容Unreal的代码，需要转换坐标系
             cb.camera = new Vector3(camera.transform.position.x, camera.transform.position.z, camera.transform.position.y) * scale;
-            // cb.view_ray = -camera.transform.forward;
-            cb.view_ray = new Vector3(-camera.transform.forward.x, -camera.transform.forward.z, -camera.transform.forward.y);
-
             // cb.sun_direction = -mainLight.transform.forward;
             cb.sun_direction = new Vector3(-mainLight.transform.forward.x, -mainLight.transform.forward.z, -mainLight.transform.forward.y);
 
-            mConstantBufferCPU.gViewProjMat = viewProjMat;
-            mConstantBufferCPU.gColor = new Vector4(0.0f, 1.0f, 1.0f, 1.0f);
-            mConstantBufferCPU.gResolution = new Vector3(camera.pixelWidth, camera.pixelHeight);
             mConstantBufferCPU.gSunIlluminance = Vector3.one * atmosphereData.mSunIlluminanceScale;
             mConstantBufferCPU.gScatteringMaxPathDepth = NumScatteringOrder;
             uiViewRayMarchMaxSPP = uiViewRayMarchMinSPP >= uiViewRayMarchMaxSPP
@@ -151,62 +158,56 @@ namespace Atmosphere
         {
             Vector2Int size = new Vector2Int(LookUpTablesInfo.TRANSMITTANCE_TEXTURE_WIDTH,
                 LookUpTablesInfo.TRANSMITTANCE_TEXTURE_HEIGHT);
-            Common.CheckOrCreateLUT(ref _transmittanceLUT, size, RenderTextureFormat.ARGBHalf);
+            AtmosphereUtils.CheckOrCreateLUT(ref _transmittanceLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("IntergalTransmittanceLUT");
             computeShader.SetTexture(index, Shader.PropertyToID("_TransmittanceLUT"), _transmittanceLUT);
-            Common.Dispatch(computeShader, index, size);
+            AtmosphereUtils.Dispatch(computeShader, index, size);
         }
 
         private void PrecomputeMuliScattLUT()
         {
             Vector2Int size = new Vector2Int(atmosphereData.MultiScatteringLUTRes, atmosphereData.MultiScatteringLUTRes);
-            Common.CheckOrCreateLUT(ref _newMuliScattLUT, size, RenderTextureFormat.ARGBHalf);
+            AtmosphereUtils.CheckOrCreateLUT(ref _newMuliScattLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("NewMultiScattCS");
             computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
             computeShader.SetTexture(index, Shader.PropertyToID("OutputTexture"), _newMuliScattLUT);
-            Common.Dispatch(computeShader, index, size);
+            AtmosphereUtils.Dispatch(computeShader, index, size);
         }
 
         private void PrecomputeSkyViewLUT()
         {
             // Vector2Int size = new Vector2Int(192, 108);
             Vector2Int size = new Vector2Int(96, 104);
-            Common.CheckOrCreateLUT(ref _skyViewLUT, size, RenderTextureFormat.ARGBHalf);
+            AtmosphereUtils.CheckOrCreateLUT(ref _skyViewLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("IntergalSkyViewLutPS");
             computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
             computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
             computeShader.SetTexture(index, Shader.PropertyToID("_SkyViewLUT"), _skyViewLUT);
-            Common.Dispatch(computeShader, index, size);
+            AtmosphereUtils.Dispatch(computeShader, index, size);
+        }
+        
+        private void PrecomputeSkyViewLUTUE()
+        {
+            // Vector2Int size = new Vector2Int(192, 108);
+            Vector2Int size = new Vector2Int(96, 104);
+            AtmosphereUtils.CheckOrCreateLUT(ref _skyViewLUT, size, RenderTextureFormat.ARGBHalf);
+            int index = computeShader.FindKernel("IntergalSkyViewLutPSUE");
+            computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
+            computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
+            computeShader.SetTexture(index, Shader.PropertyToID("_SkyViewLUT"), _skyViewLUT);
+            AtmosphereUtils.Dispatch(computeShader, index, size);
         }
 
         void PrecomputeCameraVolumeWithRayMarch()
         {
             Vector2Int size = Vector2Int.one * 64;
             size = new Vector2Int(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y);
-            Common.CheckOrCreateLUT(ref _cameraVolumeLUT, size, RenderTextureFormat.ARGBHalf, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
+            AtmosphereUtils.CheckOrCreateLUT(ref _cameraVolumeLUT, size, RenderTextureFormat.ARGBHalf, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
             int index = computeShader.FindKernel("IntergalCameraVolumeLUT");
             computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
             computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
             computeShader.SetTexture(index, Shader.PropertyToID("_CameraVolumeLUT"), _cameraVolumeLUT);
-            Common.Dispatch(computeShader, index, size, size.x);
-        }
-        
-        Vector3 MaxZero3(Vector3 a)
-        {
-            Vector3 r;
-            r.x = a.x > 0.0f ? a.x : 0.0f;
-            r.y = a.y > 0.0f ? a.y : 0.0f;
-            r.z = a.z > 0.0f ? a.z : 0.0f;
-            return r;
-        }
-
-        Vector3 sub3(Vector3 a, Vector3 b)
-        {
-            Vector3 r;
-            r.x = a.x - b.x;
-            r.y = a.y - b.y;
-            r.z = a.z - b.z;
-            return r;
+            AtmosphereUtils.Dispatch(computeShader, index, size, size.x);
         }
     }
 }

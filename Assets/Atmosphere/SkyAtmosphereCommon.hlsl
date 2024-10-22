@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#define PI 3.1415926535897932384626433832795f
+#include "./FastMathThirdParty.hlsl"
+
 
 #define UNIFORM_PHASE 0.079577472f    // 1.0 / (4.0 * PI)
 

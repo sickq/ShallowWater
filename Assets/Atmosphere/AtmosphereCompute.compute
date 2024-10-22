@@ -1,6 +1,7 @@
 #pragma kernel IntergalTransmittanceLUT
 #pragma kernel NewMultiScattCS
 #pragma kernel IntergalSkyViewLutPS
+#pragma kernel IntergalSkyViewLutPSUE
 #pragma kernel IntergalCameraVolumeLUT
 
 #pragma multi_compile _ MULTISCATAPPROX_ENABLED
@@ -221,4 +222,57 @@ void IntergalSkyViewLutPS(uint3 id: SV_DispatchThreadID)
                                                             SampleCountIni, DepthBufferValue, VariableSampleCount,
                                                             IntegrateScatteredParams);
     _SkyViewLUT[id.xy] = ss.L * weight;
+}
+
+
+[numthreads(8, 8, 1)]
+void IntergalSkyViewLutPSUE(uint3 id: SV_DispatchThreadID)
+{
+    float2 pixPos = id.xy + 0.5f;
+    AtmosphereParameters Atmosphere = GetAtmosphereParameters();
+
+    // float3 WorldPos = camera + float3(0, 0, Atmosphere.BottomRadius);
+    float3 WorldPos = float3(0, 0, Atmosphere.BottomRadius + CameraAerialPerspectiveVolumeParam.w);
+    // float2 uv = pixPos / float2(192.0, 108.0);
+    float2 uv = pixPos / float2(96.0, 104.0);
+
+    float3 WorldDir = (float3)0;
+    float viewHeight = length(WorldPos);
+
+    UvToSkyViewLutParams(Atmosphere, WorldDir, viewHeight, uv);
+
+    float3 SunDir = sun_direction;
+    
+    WorldPos = float3(0.0f, 0.0f, viewHeight);
+
+    // Move to top atmospehre
+    if (!MoveToTopAtmosphere(WorldPos, WorldDir, Atmosphere.TopRadius))
+    {
+        // Ray is not intersecting the atmosphere
+        _SkyViewLUT[id.xy] = float3(0, 0, 0);
+        return;
+    }
+
+    // Phase functions
+    float cosTheta = dot(SunDir, WorldDir);
+    float MiePhaseValue = hgPhaseSimple(Atmosphere.MiePhaseG, AtmosParam.z, -cosTheta);
+    
+    // mnegate cosTheta because due to WorldDir being a "in" direction. 
+    float RayleighPhaseValue = RayleighPhase(cosTheta);
+
+    IntegrateScatteredParam IntegrateScatteredParams = (IntegrateScatteredParam)0;
+    {
+        IntegrateScatteredParams.MieRayPhase = true;
+        IntegrateScatteredParams.MiePhaseValue = MiePhaseValue;
+        IntegrateScatteredParams.RayleighPhaseValue = RayleighPhaseValue;
+    }
+    
+    const bool ground = true;
+    const float SampleCountIni = 15;
+    const float DepthBufferValue = -1.0;
+    const bool VariableSampleCount = true;
+    SingleScatteringResult ss = IntegrateScatteredLuminance(uv, WorldPos, WorldDir, SunDir, gSunIlluminance, Atmosphere, ground,
+                                                            SampleCountIni, DepthBufferValue, VariableSampleCount,
+                                                            IntegrateScatteredParams);
+    _SkyViewLUT[id.xy] = ss.L;
 }

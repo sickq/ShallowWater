@@ -21,10 +21,11 @@ SubShader {
 
         CGPROGRAM
         #pragma vertex vert
-        #pragma fragment frag
+        #pragma fragment fragUE
 
         #include "UnityCG.cginc"
         #include "Lighting.cginc"
+        #include "RenderSkyCommon.hlsl"
 
 
         uniform half _Exposure;     // HDR exposure
@@ -43,31 +44,14 @@ SubShader {
         struct v2f
         {
             float4  pos             : SV_POSITION;
+            float4 vertex : TEXCOORD0;
+            float3 posWorld : TEXCOORD1;
 
-        #if SKYBOX_SUNDISK == SKYBOX_SUNDISK_HQ
-            // for HQ sun disk, we need vertex itself to calculate ray-dir per-pixel
-            float3  vertex          : TEXCOORD0;
-        #elif SKYBOX_SUNDISK == SKYBOX_SUNDISK_SIMPLE
-            half3   rayDir          : TEXCOORD0;
-        #else
-            // as we dont need sun disk we need just rayDir.y (sky/ground threshold)
-            half    skyGroundFactor : TEXCOORD0;
-        #endif
-
-            // calculate sky colors in vprog
-            half3   groundColor     : TEXCOORD1;
-            half3   skyColor        : TEXCOORD2;
-
-        #if SKYBOX_SUNDISK != SKYBOX_SUNDISK_NONE
-            half3   sunColor        : TEXCOORD3;
-        #endif
-
-            UNITY_VERTEX_OUTPUT_STEREO
         };
 
-        float4 CameraAerialPerspectiveVolumeParam;
-	    float4 CameraAerialPerspectiveVolumeParam2;
-	    float4 CameraAerialPerspectiveVolumeParam3;
+     //    float4 CameraAerialPerspectiveVolumeParam;
+	    // float4 CameraAerialPerspectiveVolumeParam2;
+	    // float4 CameraAerialPerspectiveVolumeParam3;
 
         float4 g_AtmosphereLightDirection;
 
@@ -79,9 +63,9 @@ SubShader {
             UNITY_SETUP_INSTANCE_ID(v);
             UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
             OUT.pos = UnityObjectToClipPos(v.vertex);
+            OUT.posWorld = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0));
 
-            OUT.vertex = v.vertex.xyz;
-            
+            OUT.vertex = v.vertex;
             return OUT;
         }
 
@@ -143,6 +127,39 @@ SubShader {
 
             return half4(col, 0.0);
 
+        }
+
+        float3 GetSunSunLuminance(float3 WorldDir, float3 sunDir, float intersectGround)
+        {
+	        if (dot(WorldDir, sunDir) > cos(3*1.505*3.14159 / 180.0))
+	        {
+		        if (intersectGround > 0.0f) // no intersection
+		        {
+			        const float3 SunLuminance = 1; // arbitrary. But fine, not use when comparing the models
+			        return SunLuminance * 1;
+		        }
+	        }
+	        return 0;
+        }
+        
+        half4 fragUE(v2f IN) : SV_Target
+        {
+            float3 WorldPos = float3(0, 0, 6360.0f + CameraAerialPerspectiveVolumeParam.w);
+            // float3 WorldDir = normalize(IN.vertex.xzy);
+            float3 WorldDir = normalize(normalize((IN.posWorld.xzy - _WorldSpaceCameraPos.xzy) * 6420.0f - WorldPos));
+
+            float viewHeight = length(WorldPos);
+            float2 uv;
+            float3 UpVector = normalize(WorldPos);
+            float viewZenithCosAngle = dot(WorldDir, UpVector);
+
+            // float IntersectGround = raySphereIntersectNearest(WorldPos, WorldDir, float3(0, 0, 0), 6360.0f);
+            
+            SkyViewLutParamsToUv(WorldDir.z, viewZenithCosAngle, WorldDir, viewHeight, 6360, float2(96.0f, 104.0f), uv);
+
+            float4 col = tex2D(_SkyViewLutTextureL, uv);
+            col.rgb += GetSunSunLuminance(WorldDir, -g_AtmosphereLightDirection.xzw, WorldDir.z);
+            return col;
         }
         ENDCG
     }
