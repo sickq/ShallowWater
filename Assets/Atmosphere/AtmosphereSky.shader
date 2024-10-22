@@ -21,7 +21,7 @@ SubShader {
 
         CGPROGRAM
         #pragma vertex vert
-        #pragma fragment fragUE
+        #pragma fragment frag
 
         #include "UnityCG.cginc"
         #include "Lighting.cginc"
@@ -44,14 +44,12 @@ SubShader {
         struct v2f
         {
             float4  pos             : SV_POSITION;
-            float4 vertex : TEXCOORD0;
+            float3 vertex : TEXCOORD0;
             float3 posWorld : TEXCOORD1;
 
+            UNITY_VERTEX_OUTPUT_STEREO
         };
 
-     //    float4 CameraAerialPerspectiveVolumeParam;
-	    // float4 CameraAerialPerspectiveVolumeParam2;
-	    // float4 CameraAerialPerspectiveVolumeParam3;
 
         float4 g_AtmosphereLightDirection;
 
@@ -64,8 +62,9 @@ SubShader {
             UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
             OUT.pos = UnityObjectToClipPos(v.vertex);
             OUT.posWorld = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0));
-
+            
             OUT.vertex = v.vertex;
+            
             return OUT;
         }
 
@@ -102,7 +101,7 @@ SubShader {
         {
             half3 col = half3(0.0, 0.0, 0.0);
 
-            float3 uniformVertPos = normalize(IN.vertex);
+            float3 uniformVertPos = normalize(IN.vertex.xyz);
             float reverseY = (1 - uniformVertPos.y) * 0.5f;
             
             float xz = 1 - uniformVertPos.y * uniformVertPos.y;
@@ -126,7 +125,6 @@ SubShader {
             col = tex2D(_SkyViewLutTextureL, tempUV);
 
             return half4(col, 0.0);
-
         }
 
         float3 GetSunSunLuminance(float3 WorldDir, float3 sunDir, float intersectGround)
@@ -161,6 +159,7 @@ SubShader {
             col.rgb += GetSunSunLuminance(WorldDir, -g_AtmosphereLightDirection.xzw, WorldDir.z);
             return col;
         }
+        
         ENDCG
     }
 }

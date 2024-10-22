@@ -104,17 +104,13 @@ namespace Atmosphere
 
             // cb.CameraAerialPerspectiveVolumeParam = LookUpTablesInfo.SCATTERING_TEXTURE_NU_SIZE;
             cb.CameraAerialPerspectiveVolumeParam = new Vector4(VolumeHeight, VolumeDepth, 1.0f, CameraHeightOffset);
-            // GameObject go = new GameObject();
-            // go.transform.forward = -mainLight.transform.forward;
-            // float rotateRad = -mainLight.transform.rotation.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
-            // GameObject.Destroy(go);
-            
-            Quaternion quaternion = Quaternion.LookRotation(-mainLight.transform.forward);
-            float rotateRad = -quaternion.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
-            
+            GameObject go = new GameObject();
+            go.transform.forward = -mainLight.transform.forward;
+            float rotateRad = -mainLight.transform.rotation.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
+            GameObject.Destroy(go);
+
             cb.CameraAerialPerspectiveVolumeParam2 = new Vector4(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, rotateRad, 0.0f);
             cb.CameraAerialPerspectiveVolumeParam3 = new Vector4(VolumeOffset, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
-
 
             cb.AtmosParam = new Vector4(0.0f, atmosphereData.AtmosphereColorOffsetWeight, AtmosphereUtils.GetHgPhaseK(atmosphereData.mie_phase_function_g), 0.0f);
             cb.AtmosParam1 = atmosphereData.AtmosphereColor1;
