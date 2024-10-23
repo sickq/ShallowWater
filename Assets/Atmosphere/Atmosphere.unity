@@ -917,7 +917,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c1be14efe3e446f4a849c25bb4b1ceed, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  skyViewLUTType: 1
+  skyViewLUTType: 0
   mainLight: {fileID: 2144530143}
   computeShader: {fileID: 7200000, guid: 4fffa00caeba28a4abd4a377807f2522, type: 3}
   atmosphereData: {fileID: 11400000, guid: 9725819e4d714144bb653de64c75ca7f, type: 2}

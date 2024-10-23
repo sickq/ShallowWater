@@ -19,7 +19,7 @@ MonoBehaviour:
   EarthMieScaleHeight: 0.3
   MieFadeBegin: 0
   EarthBottomRadius: 6360
-  AtmosphereHeight: 91.6
+  AtmosphereHeight: 60
   MieExtinctionColor: {r: 0.35055, g: 0.20272, b: 0.21735, a: 1}
   MieExtinctionLength: 1
   MieScatteringColor: {r: 0.20755, g: 0.05972, b: 0.07435, a: 1}

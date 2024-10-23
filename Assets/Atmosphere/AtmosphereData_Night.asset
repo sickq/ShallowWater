@@ -13,25 +13,25 @@ MonoBehaviour:
   m_Name: AtmosphereData_Night
   m_EditorClassIdentifier: 
   currentMultipleScatteringFactor: 1
-  mie_phase_function_g: 0.675
-  mSunIlluminanceScale: 7.17
+  mie_phase_function_g: 0.8
+  mSunIlluminanceScale: 9.8
   EarthRayleighScaleHeight: 8
-  EarthMieScaleHeight: 0.88
+  EarthMieScaleHeight: 0.3
   MieFadeBegin: 0
   EarthBottomRadius: 6360
   AtmosphereHeight: 60
-  MieExtinctionColor: {r: 0.13895, g: 0.16984, b: 0.22245, a: 1}
+  MieExtinctionColor: {r: 0.22724, g: 0.21903, b: 0.18629, a: 1}
   MieExtinctionLength: 1
-  MieScatteringColor: {r: 0.09116, g: 0.12205, b: 0.17466, a: 1}
+  MieScatteringColor: {r: 0.09724, g: 0.13018, b: 0.18629, a: 1}
   MieScatteringLength: 1
   RayleighScatteringColor: {r: 0.00713, g: 0.0132, b: 0.02738, a: 1}
   RayleighScatteringLength: 1
-  AbsorptionExtinctionColor: {r: 0.0181, g: 0.00699, b: 0, a: 1}
+  AbsorptionExtinctionColor: {r: 0.13, g: 0.08885, b: 0, a: 1}
   AbsorptionExtinctionLength: 1
-  GroundAlbedo: {r: 0.7433963, g: 0.7433963, b: 0.7433963, a: 1}
-  AtmosphereColorOffsetWeight: 0
-  AtmosphereColor1: {r: 0.17012, g: 0.04081, b: 0.03251, a: 1}
-  AtmosphereColor2: {r: 0.82988, g: 0.95919, b: 0.96749, a: 1}
+  GroundAlbedo: {r: 0.11321, g: 0.11321, b: 0.1132, a: 1}
+  AtmosphereColorOffsetWeight: 1
+  AtmosphereColor1: {r: 0.46024, g: 0.38126, b: 0.29837, a: 1}
+  AtmosphereColor2: {r: 0.53976, g: 0.61874, b: 0.70163, a: 1}
   AbsorptionDensity0LayerWidth: 25
   AbsorptionDensity0ConstantTerm: -0.66667
   AbsorptionDensity0LinearTerm: 0.06667
