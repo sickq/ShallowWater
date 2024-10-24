@@ -13,9 +13,6 @@ struct SingleScatteringResult
     float3 OpticalDepth; // Optical depth (1/m)
     float3 Transmittance; // Transmittance in [0,1] (unitless)
     float3 MultiScatAs1;
-
-    float3 NewMultiScatStep0Out;
-    float3 NewMultiScatStep1Out;
 };
 
 SingleScatteringResult IntegrateScatteredLuminance(
@@ -127,7 +124,6 @@ SingleScatteringResult IntegrateScatteredLuminance(
         float3 PhaseTimesScattering;
         if (IntegrateScattered.MieRayPhase)
         {
-            // float mieWeight = WorldDir.z >= 0 ? 1.0f : 0.0f;
             PhaseTimesScattering = medium.scatteringMie * IntegrateScattered.MiePhaseValue + medium.scatteringRay * IntegrateScattered.RayleighPhaseValue;
         }
         else
@@ -139,7 +135,6 @@ SingleScatteringResult IntegrateScatteredLuminance(
         float tEarth = raySphereIntersectNearest(P, SunDir, earthO + PLANET_RADIUS_OFFSET * UpVector,
                                                  Atmosphere.BottomRadius);
         float earthShadow = tEarth >= 0.0f ? 0.0f : 1.0f;
-        // float earthShadow = 0.0f;
 
         // Dual scattering for multi scattering 
 
@@ -149,16 +144,8 @@ SingleScatteringResult IntegrateScatteredLuminance(
         #endif
 
         float shadow = 1.0f;
-        #if SHADOWMAP_ENABLED
-		// First evaluate opaque shadow
-		shadow = getShadow(Atmosphere, P);
-        // result.L = float3(shadow,0,0);
-        // return result;
 
-        #endif
-
-        float3 S = globalL * (earthShadow * shadow * TransmittanceToSun * PhaseTimesScattering + multiScatteredLuminance
-            * medium.scattering);
+        float3 S = globalL * (earthShadow * shadow * TransmittanceToSun * PhaseTimesScattering + multiScatteredLuminance * medium.scattering);
 
         // When using the power serie to accumulate all sattering order, serie r must be <1 for a serie to converge.
         // Under extreme coefficient, MultiScatAs1 can grow larger and thus result in broken visuals.
@@ -175,29 +162,11 @@ SingleScatteringResult IntegrateScatteredLuminance(
         result.MultiScatAs1 += throughput * MSint;
         #endif
 
-        // Evaluate input to multi scattering 
-        {
-            float3 newMS;
-
-            newMS = earthShadow * TransmittanceToSun * medium.scattering * uniformPhase * 1;
-            result.NewMultiScatStep0Out += throughput * (newMS - newMS * SampleTransmittance) / medium.extinction;
-            //	result.NewMultiScatStep0Out += SampleTransmittance * throughput * newMS * dt;
-
-            newMS = medium.scattering * uniformPhase * multiScatteredLuminance;
-            result.NewMultiScatStep1Out += throughput * (newMS - newMS * SampleTransmittance) / medium.extinction;
-            //	result.NewMultiScatStep1Out += SampleTransmittance * throughput * newMS * dt;
-        }
-
-        #if 0
-		L += throughput * S * dt;
-		throughput *= SampleTransmittance;
-        #else
         // See slide 28 at http://www.frostbite.com/2015/08/physically-based-unified-volumetric-rendering-in-frostbite/
         float3 extinctionTemp = max(0.0000001f, medium.extinction);
         float3 Sint = (S - S * SampleTransmittance) / extinctionTemp; // integrate along the current step segment 
         L += throughput * Sint; // accumulate and also take into account the transmittance from previous steps
         throughput *= SampleTransmittance;
-        #endif
 
         tPrev = t;
     }

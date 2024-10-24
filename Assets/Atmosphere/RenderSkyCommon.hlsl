@@ -75,11 +75,17 @@ Ray createRay(in float3 p, in float3 d)
 // We should precompute those terms from resolutions (Or set resolution as #defined constants)
 float fromUnitToSubUvs(float u, float resolution) { return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f)); }
 float fromSubUvsToUnit(float u, float resolution) { return (u - 0.5f / resolution) * (resolution / (resolution - 1.0f)); }
+float2 fromSubUvsToUnit(float2 u, float2 resolution) { return (u - float2(0.5f, 0.5f) / resolution) * (resolution / (resolution - float2(1.0f, 1.0f))); }
 
 float2 fromUnitToSubUvs(float2 u, float2 resolution)
 {
 	return float2(fromUnitToSubUvs(u.x, resolution.x), fromUnitToSubUvs(u.y, resolution.y));
 }
+
+// float2 fromUnitToSubUvs(float2 u, float2 resolution)
+// {
+// 	return float2(fromUnitToSubUvs(u, resolution));
+// }
 
 void UvToLutTransmittanceParams(AtmosphereParameters Atmosphere, out float viewHeight, out float viewZenithCosAngle, in float2 uv)
 {
@@ -97,8 +103,6 @@ void UvToLutTransmittanceParams(AtmosphereParameters Atmosphere, out float viewH
 	viewZenithCosAngle = d == 0.0 ? 1.0f : (H * H - rho * rho - d * d) / (2.0 * viewHeight * d);
 	viewZenithCosAngle = clamp(viewZenithCosAngle, -1.0, 1.0);
 }
-
-#define NONLINEARSKYVIEWLUT 1
 
 void UvToSkyViewLutParams(AtmosphereParameters Atmosphere, out float3 ViewDir, in float ViewHeight, in float2 UV)
 {

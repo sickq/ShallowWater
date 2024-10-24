@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEngine.Rendering;
 
 namespace Atmosphere
 {
@@ -10,6 +11,7 @@ namespace Atmosphere
         UE,
     }
     
+    [ExecuteAlways]
     public class PrecomputeAtmosphere : MonoBehaviour
     {
         private CommonConstantBufferStructure mConstantBufferCPU = new CommonConstantBufferStructure();
@@ -30,39 +32,63 @@ namespace Atmosphere
         public float VolumeHeight = 9.0f;
         public float VolumeDepth = 30.0f;
 
-        private ComputeBuffer constantBuffer;
+        private CommandBuffer cmdBuffer;
+        private LocalKeyword multiScatApproxKeyword;
 
+        
         private void OnEnable()
         {
-            
+            multiScatApproxKeyword = new LocalKeyword(computeShader, "MULTISCATAPPROX_ENABLED");
+            PipelineUtils.ReleaseCommandBuffer(ref cmdBuffer);
+            cmdBuffer = new CommandBuffer() { name = "Precompute Atmosphere" };
         }
 
         private void OnDisable()
         {
-            
+            PipelineUtils.ReleaseCommandBuffer(ref cmdBuffer);
         }
 
         private void LateUpdate()
         {
+            cmdBuffer.Clear();
+            cmdBuffer.BeginSample("Precompute Atmosphere");
+            cmdBuffer.BeginSample("UpdateConstantBuffer");
             UpdateConstantBuffer(Camera.main);
+            cmdBuffer.EndSample("UpdateConstantBuffer");
+            
+            cmdBuffer.BeginSample("PrecomputeTransmittanceLUT");
             PrecomputeTransmittanceLUT();
+            cmdBuffer.EndSample("PrecomputeTransmittanceLUT");
 
-            computeShader.DisableKeyword("MULTISCATAPPROX_ENABLED");
+            cmdBuffer.BeginSample("PrecomputeMuliScattLUT");
+            cmdBuffer.DisableKeyword(computeShader, multiScatApproxKeyword);
             PrecomputeMuliScattLUT();
-            computeShader.EnableKeyword("MULTISCATAPPROX_ENABLED");
+            cmdBuffer.EnableKeyword(computeShader, multiScatApproxKeyword);
+            cmdBuffer.EndSample("PrecomputeMuliScattLUT");
 
             switch (skyViewLUTType)
             {
                 case AtmosphereLUTType.Optimized:
+                    cmdBuffer.BeginSample("PrecomputeSkyViewLUT");
                     PrecomputeSkyViewLUT();
+                    cmdBuffer.EndSample("PrecomputeSkyViewLUT");
                     break;
                 case AtmosphereLUTType.UE:
+                    cmdBuffer.BeginSample("PrecomputeSkyViewLUTUE");
                     PrecomputeSkyViewLUTUE();
+                    cmdBuffer.EndSample("PrecomputeSkyViewLUT");
                     break;
             }
             
+            cmdBuffer.BeginSample("PrecomputeCameraVolumeWithRayMarch");
             PrecomputeCameraVolumeWithRayMarch();
+            cmdBuffer.EndSample("PrecomputeCameraVolumeWithRayMarch");
             
+            cmdBuffer.EndSample("Precompute Atmosphere");
+
+            Graphics.ExecuteCommandBuffer(cmdBuffer);
+            
+
             Shader.SetGlobalTexture("_SkyViewLutTextureL", _skyViewLUT);
             Shader.SetGlobalVector("g_AtmosphereLightDirection", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, mainLight.transform.forward.z, mainLight.transform.forward.y));
         }
@@ -99,15 +125,12 @@ namespace Atmosphere
             cb.SCATTERING_TEXTURE_MU_SIZE = LookUpTablesInfo.SCATTERING_TEXTURE_MU_SIZE;
             cb.SCATTERING_TEXTURE_MU_S_SIZE = LookUpTablesInfo.SCATTERING_TEXTURE_MU_S_SIZE;
             cb.SCATTERING_TEXTURE_NU_SIZE = LookUpTablesInfo.SCATTERING_TEXTURE_NU_SIZE;
-            // cb.SKY_SPECTRAL_RADIANCE_TO_LUMINANCE = new Vector3(114974.916437f, 71305.954816f, 65310.548555f);
-            // cb.SUN_SPECTRAL_RADIANCE_TO_LUMINANCE = new Vector3(98242.786222f, 69954.398112f, 66475.012354f);
 
-            // cb.CameraAerialPerspectiveVolumeParam = LookUpTablesInfo.SCATTERING_TEXTURE_NU_SIZE;
             cb.CameraAerialPerspectiveVolumeParam = new Vector4(VolumeHeight, VolumeDepth, 1.0f, CameraHeightOffset);
             GameObject go = new GameObject();
             go.transform.forward = -mainLight.transform.forward;
             float rotateRad = -mainLight.transform.rotation.eulerAngles.y * Mathf.Deg2Rad - (3.14f / 2.0f);
-            GameObject.Destroy(go);
+            PipelineUtils.DestroyObject(go);
 
             cb.CameraAerialPerspectiveVolumeParam2 = new Vector4(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, rotateRad, 0.0f);
             cb.CameraAerialPerspectiveVolumeParam3 = new Vector4(VolumeOffset, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y, 1.0f / LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
@@ -138,26 +161,27 @@ namespace Atmosphere
                 : uiViewRayMarchMaxSPP;
             mConstantBufferCPU.RayMarchMinMaxSPP = new Vector3(uiViewRayMarchMinSPP, uiViewRayMarchMaxSPP);
 
-            AtmosphereUtils.SetConstant(computeShader, typeof(CommonConstantBufferStructure), mConstantBufferCPU);
-            AtmosphereUtils.SetConstant(computeShader, typeof(SkyAtmosphereConstantBufferStructure), cb);
+            AtmosphereUtils.SetConstant(cmdBuffer, computeShader, typeof(CommonConstantBufferStructure), mConstantBufferCPU);
+            AtmosphereUtils.SetConstant(cmdBuffer, computeShader, typeof(SkyAtmosphereConstantBufferStructure), cb);
         }
         
         int NumScatteringOrder = 4;
         int uiViewRayMarchMinSPP = 4;
         int uiViewRayMarchMaxSPP = 14;
-        public RenderTexture _transmittanceLUT;
-        public RenderTexture _newMuliScattLUT;
-        public RenderTexture _skyViewLUT;
-        public RenderTexture _cameraVolumeLUT;
+        [System.NonSerialized] public RenderTexture _transmittanceLUT;
+        [System.NonSerialized] public RenderTexture _newMuliScattLUT;
+        [System.NonSerialized] public RenderTexture _skyViewLUT;
+        [System.NonSerialized] public RenderTexture _cameraVolumeLUT;
         
-         private void PrecomputeTransmittanceLUT()
+        private void PrecomputeTransmittanceLUT()
         {
             Vector2Int size = new Vector2Int(LookUpTablesInfo.TRANSMITTANCE_TEXTURE_WIDTH,
                 LookUpTablesInfo.TRANSMITTANCE_TEXTURE_HEIGHT);
             AtmosphereUtils.CheckOrCreateLUT(ref _transmittanceLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("IntergalTransmittanceLUT");
-            computeShader.SetTexture(index, Shader.PropertyToID("_TransmittanceLUT"), _transmittanceLUT);
-            AtmosphereUtils.Dispatch(computeShader, index, size);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("_TransmittanceLUT"), _transmittanceLUT);
+            // computeShader.SetTexture(index, Shader.PropertyToID("_TransmittanceLUT"), _transmittanceLUT);
+            AtmosphereUtils.Dispatch(cmdBuffer, computeShader, index, size);
         }
 
         private void PrecomputeMuliScattLUT()
@@ -165,21 +189,20 @@ namespace Atmosphere
             Vector2Int size = new Vector2Int(atmosphereData.MultiScatteringLUTRes, atmosphereData.MultiScatteringLUTRes);
             AtmosphereUtils.CheckOrCreateLUT(ref _newMuliScattLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("NewMultiScattCS");
-            computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("OutputTexture"), _newMuliScattLUT);
-            AtmosphereUtils.Dispatch(computeShader, index, size);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("OutputTexture"), _newMuliScattLUT);
+            AtmosphereUtils.Dispatch(cmdBuffer, computeShader, index, size);
         }
 
         private void PrecomputeSkyViewLUT()
         {
-            // Vector2Int size = new Vector2Int(192, 108);
             Vector2Int size = new Vector2Int(96, 104);
             AtmosphereUtils.CheckOrCreateLUT(ref _skyViewLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("IntergalSkyViewLutPS");
-            computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("_SkyViewLUT"), _skyViewLUT);
-            AtmosphereUtils.Dispatch(computeShader, index, size);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("_SkyViewLUT"), _skyViewLUT);
+            AtmosphereUtils.Dispatch(cmdBuffer, computeShader, index, size);
         }
         
         private void PrecomputeSkyViewLUTUE()
@@ -188,22 +211,21 @@ namespace Atmosphere
             Vector2Int size = new Vector2Int(96, 104);
             AtmosphereUtils.CheckOrCreateLUT(ref _skyViewLUT, size, RenderTextureFormat.ARGBHalf);
             int index = computeShader.FindKernel("IntergalSkyViewLutPSUE");
-            computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("_SkyViewLUT"), _skyViewLUT);
-            AtmosphereUtils.Dispatch(computeShader, index, size);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("_SkyViewLUT"), _skyViewLUT);
+            AtmosphereUtils.Dispatch(cmdBuffer, computeShader, index, size);
         }
 
         void PrecomputeCameraVolumeWithRayMarch()
         {
-            Vector2Int size = Vector2Int.one * 64;
-            size = new Vector2Int(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y);
+            Vector2Int size = new Vector2Int(LookUpTablesInfo.CAMERA_VOLUME_SIZE_X, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Y);
             AtmosphereUtils.CheckOrCreateLUT(ref _cameraVolumeLUT, size, RenderTextureFormat.ARGBHalf, LookUpTablesInfo.CAMERA_VOLUME_SIZE_Z);
             int index = computeShader.FindKernel("IntergalCameraVolumeLUT");
-            computeShader.SetTexture(index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
-            computeShader.SetTexture(index, Shader.PropertyToID("_CameraVolumeLUT"), _cameraVolumeLUT);
-            AtmosphereUtils.Dispatch(computeShader, index, size, size.x);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("TransmittanceLutTexture"), _transmittanceLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("MultiScatTexture"), _newMuliScattLUT);
+            cmdBuffer.SetComputeTextureParam(computeShader, index, Shader.PropertyToID("_CameraVolumeLUT"), _cameraVolumeLUT);
+            AtmosphereUtils.Dispatch(cmdBuffer, computeShader, index, size, size.x);
         }
     }
 }

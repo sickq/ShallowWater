@@ -2,8 +2,9 @@
 
 #include "./FastMathThirdParty.hlsl"
 
-
 #define UNIFORM_PHASE 0.079577472f    // 1.0 / (4.0 * PI)
+#define BOTTOM_RADIUS_SQR 40449600
+#define TOP_RADIUS_SQR 41216400
 
 SamplerState samplerLinearClamp : register(s0);
 
@@ -204,19 +205,36 @@ float raySphereIntersectNearest(float3 r0, float3 rd, float3 s0, float sR)
 }
 
 
+// void LutTransmittanceParamsToUv(AtmosphereParameters Atmosphere, in float viewHeight, in float viewZenithCosAngle, out float2 uv)
+// {
+// 	float H = sqrt(max(0.0f, Atmosphere.TopRadius * Atmosphere.TopRadius - Atmosphere.BottomRadius * Atmosphere.BottomRadius));
+// 	float rho = sqrt(max(0.0f, viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius));
+//
+// 	float discriminant = viewHeight * viewHeight * (viewZenithCosAngle * viewZenithCosAngle - 1.0) + Atmosphere.TopRadius * Atmosphere.TopRadius;
+// 	float d = max(0.0, (-viewHeight * viewZenithCosAngle + sqrt(discriminant))); // Distance to atmosphere boundary
+//
+// 	float d_min = Atmosphere.TopRadius - viewHeight;
+// 	float d_max = rho + H;
+// 	float x_mu = (d - d_min) / (d_max - d_min);
+// 	float x_r = rho / H;
+//
+// 	uv = float2(x_mu, x_r);
+// 	//uv = float2(fromUnitToSubUvs(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromUnitToSubUvs(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT)); // No real impact so off
+// }
+
 void LutTransmittanceParamsToUv(AtmosphereParameters Atmosphere, in float viewHeight, in float viewZenithCosAngle, out float2 uv)
 {
-	float H = sqrt(max(0.0f, Atmosphere.TopRadius * Atmosphere.TopRadius - Atmosphere.BottomRadius * Atmosphere.BottomRadius));
-	float rho = sqrt(max(0.0f, viewHeight * viewHeight - Atmosphere.BottomRadius * Atmosphere.BottomRadius));
+	// float H = sqrt(TOP_RADIUS_SQR - BOTTOM_RADIUS_SQR);
+	float H = 875.671171f;
+	float rho = sqrt(max(0.0f, viewHeight * viewHeight - BOTTOM_RADIUS_SQR));
 
-	float discriminant = viewHeight * viewHeight * (viewZenithCosAngle * viewZenithCosAngle - 1.0) + Atmosphere.TopRadius * Atmosphere.TopRadius;
+	float discriminant = viewHeight * viewHeight * (viewZenithCosAngle * viewZenithCosAngle - 1.0) + TOP_RADIUS_SQR;
 	float d = max(0.0, (-viewHeight * viewZenithCosAngle + sqrt(discriminant))); // Distance to atmosphere boundary
 
-	float d_min = Atmosphere.TopRadius - viewHeight;
+	float d_min = 6420 - viewHeight;
 	float d_max = rho + H;
 	float x_mu = (d - d_min) / (d_max - d_min);
 	float x_r = rho / H;
 
 	uv = float2(x_mu, x_r);
-	//uv = float2(fromUnitToSubUvs(uv.x, TRANSMITTANCE_TEXTURE_WIDTH), fromUnitToSubUvs(uv.y, TRANSMITTANCE_TEXTURE_HEIGHT)); // No real impact so off
 }

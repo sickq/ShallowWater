@@ -38,6 +38,12 @@ namespace Atmosphere
                 lutSize.y / (int)threadNumY, z);
         }
         
+        public static void Dispatch(CommandBuffer buffer, ComputeShader cs, int kernel, Vector2Int lutSize, int z = 1)
+        {
+            cs.GetKernelThreadGroupSizes(kernel, out var threadNumX, out var threadNumY, out var threadNumZ);
+            buffer.DispatchCompute(cs, kernel, lutSize.x / (int)threadNumX, lutSize.y / (int)threadNumY, z);
+        }
+        
         public static int SetConstant(ComputeShader computeShader, Type structType, object cb)
         {
             FieldInfo[] fields = structType.GetFields(BindingFlags.Public | BindingFlags.Instance);
@@ -78,6 +84,57 @@ namespace Atmosphere
                 else if (field.FieldType == typeof(Matrix4x4))
                 {
                     computeShader.SetMatrix(field.Name, (Matrix4x4)value);
+                    size += 16;
+                }
+                else
+                {
+                    throw new Exception("not find type:" + field.FieldType);
+                }
+            }
+
+            return size;
+        }
+        
+        public static int SetConstant(CommandBuffer cmdBuffer, ComputeShader computeShader, Type structType, object cb)
+        {
+            FieldInfo[] fields = structType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+            int size = 0;
+            foreach (FieldInfo field in fields)
+            {
+                var value = field.GetValue(cb);
+                if (field.FieldType == typeof(float))
+                {
+                    cmdBuffer.SetComputeFloatParam(computeShader, field.Name, (float)value);
+                    size++;
+                }
+                else if (field.FieldType == typeof(int))
+                {
+                    cmdBuffer.SetComputeIntParam(computeShader, field.Name, (int)value);
+                    size++;
+                }
+                else if (field.FieldType == typeof(float[]))
+                {
+                    cmdBuffer.SetComputeFloatParams(computeShader, field.Name, (float[])value);
+                    size += ((float[])value).Length;
+                }
+                else if (field.FieldType == typeof(Vector3))
+                {
+                    cmdBuffer.SetComputeVectorParam(computeShader, field.Name, (Vector3)value);
+                    size += 3;
+                }
+                else if (field.FieldType == typeof(Vector4))
+                {
+                    cmdBuffer.SetComputeVectorParam(computeShader, field.Name, (Vector4)value);
+                    size += 4;
+                }
+                else if (field.FieldType == typeof(Color))
+                {
+                    cmdBuffer.SetComputeVectorParam(computeShader, field.Name, (Vector4)((Color)value));
+                    size += 4;
+                }
+                else if (field.FieldType == typeof(Matrix4x4))
+                {
+                    cmdBuffer.SetComputeMatrixParam(computeShader, field.Name, (Matrix4x4)value);
                     size += 16;
                 }
                 else
