@@ -198,9 +198,10 @@ void main()
     u_xlat2.xyz = vs_TEXCOORD0.xyz + (-_startPosOS.xyz);
 
 
+    //osViewDir
     u_xlat2.xyz = vec3(u_xlat39) * u_xlat2.xyz;
 
-    // Ray
+    //viewDir
     u_xlat0.xyz = vec3(u_xlat39) * u_xlat0.xyz;
 
 
@@ -220,6 +221,7 @@ void main()
     u_xlat41 = u_xlat40 * invscale.x;
     u_xlat41 = u_xlat41 * 64.0;
     u_xlat41 = log2(u_xlat41);
+    //perlinForSkyCloudMipmap
     u_xlat41 = max(u_xlat41, 0.0);
 
     //_PerlinOffsetAndScale.w
@@ -232,8 +234,11 @@ void main()
     u_xlat27.x = u_xlat27.x * invscale.x;
     u_xlat27.x = u_xlat27.x * 64.0;
     u_xlat27.x = log2(u_xlat27.x);
-
+    //u_xlat27.x  worleyNoiseTexMipmap
+    //u_xlat27.y  perlinToDilateWorleyMipmap
+    //u_xlat41    perlinForSkyCloudMipmap
     u_xlat27.xy = max(u_xlat27.xy, vec2(0.0, 0.0));
+
 
 
     u_xlat3.x = scale.y / u_xlat0.y;
@@ -252,6 +257,8 @@ void main()
     u_xlat29 = u_xlat29 * _FakeCloudTransmittanceParam.y;
     u_xlat29 = exp2(u_xlat29);
     u_xlat29 = (-u_xlat29) * _FakeCloudTransmittanceParam.x + 1.0;
+
+    //transmittanceWeight
     u_xlat29 = u_xlat29 * _subRayParam.y;
 
     u_xlat42 = _phaseParam.z * u_xlat16 + _phaseParam.y;
@@ -267,32 +274,45 @@ void main()
     u_xlat16 = exp2(u_xlat16);
     u_xlat16 = _backPhaseParam.x / u_xlat16;
 
+    //phaseValueTotal
     u_xlat16 = u_xlat16 + u_xlat42;
 
 
+    //lightColor
     u_xlat4.xyz = vec3(u_xlat16) * _sunColor.xyz;
 
 
     u_xlat1.y = u_xlat1.x + u_xlat3.x;
+    //osViewDirInCloud
     u_xlat3.xyw = u_xlat2.xyz * invscale.xyz;
+
     u_xlat5.xy = u_xlat1.xy * _sampleParam.xx + _sampleParam.yy;
     u_xlat5.xy = log2(u_xlat5.xy);
     u_xlat5.xy = u_xlat5.xy * vec2(0.693147182, 0.693147182);
     u_xlat5.xy = u_xlat5.xy / _sampleParam.xx;
+
+
+
     u_xlat18.xy = ceil(u_xlat5.xy);
     u_xlati14 = int(u_xlat18.x);
+    
     u_xlat43 = u_xlat18.x * _sampleParam.x;
     u_xlat43 = u_xlat43 * 1.44269502;
     u_xlat43 = exp2(u_xlat43);
+
     u_xlat5.x = (-u_xlat5.x) + u_xlat18.x;
     u_xlat2.xyz = u_xlat2.xyz * u_xlat5.xxx;
     u_xlat2.xyz = u_xlat2.xyz * vec3(u_xlat43) + vs_TEXCOORD0.xyz;
+
+
     u_xlat5.x = min(u_xlat18.y, _sampleParam.w);
     u_xlati5 = int(u_xlat5.x);
     u_xlati14 = (-u_xlati14) + u_xlati5;
+
     u_xlat14.x = float(u_xlati14);
     u_xlat14.x = min(u_xlat14.x, _sampleParam.z);
     u_xlati14 = int(u_xlat14.x);
+
     u_xlat5.x = _sampleParam.x * 1.44269502;
     u_xlat5.x = exp2(u_xlat5.x);
     u_xlat2.xyz = u_xlat2.xyz * invscale.xyz;
@@ -301,11 +321,15 @@ void main()
 #else
     u_xlat2.xyz = clamp(u_xlat2.xyz, 0.0, 1.0);
 #endif
+
     u_xlat18.x = float(0.0);
     u_xlat18.y = float(0.0);
     u_xlat18.z = float(0.0);
+
     u_xlat6.xyz = u_xlat2.xyz;
+
     u_xlat45 = u_xlat43;
+
     u_xlat7 = float(1.0);
     u_xlati20 = int(0);
     while(true){
@@ -324,15 +348,20 @@ void main()
 
         
         u_xlati20 = u_xlati20 + 1;
+
+
+
         u_xlat33.xy = u_xlat6.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
         u_xlat8.xy = u_xlat33.xy * _PerlinOffsetAndScale.ww;
         u_xlat16_33 = textureLod(_perlinForSkyCloudTex, u_xlat33.xy, u_xlat41).x;
         u_xlat16_46 = textureLod(_perlinToDilateWorley, u_xlat8.xy, u_xlat27.y).x;
+
         u_xlat33.x = u_xlat16_46 * _Worley2Param.x + u_xlat16_33;
         u_xlat33.x = u_xlat33.x * _Worley2Param.y;
         u_xlat33.x = log2(u_xlat33.x);
         u_xlat33.x = u_xlat33.x * _CloudNoiseParam.x;
         u_xlat33.x = exp2(u_xlat33.x);
+
         u_xlat8.xy = u_xlat6.xz * _CloudNoiseParam.yy;
         u_xlat8.z = u_xlat6.y * _WorleyOffsetAndScale.w;
         u_xlat8.xyz = u_xlat8.xyz + _WorleyOffsetAndScale.xzy;
@@ -343,6 +372,10 @@ void main()
 #else
         u_xlat46 = clamp(u_xlat46, 0.0, 1.0);
 #endif
+
+
+
+
         u_xlat33.x = (-u_xlat46) * _CloudNoiseParam.z + u_xlat33.x;
         u_xlat8.x = (-u_xlat46) * _CloudNoiseParam.z + 1.0;
         u_xlat8.x = max(u_xlat8.x, 9.99999997e-07);
@@ -352,6 +385,8 @@ void main()
 #else
         u_xlat33.x = clamp(u_xlat33.x, 0.0, 1.0);
 #endif
+
+
         u_xlat21 = (-u_xlat6.y) + u_xlat33.x;
         u_xlat21 = u_xlat21 * _Worley2Param.z;
         u_xlat34 = u_xlat6.y * _Worley2Param.w;
@@ -369,9 +404,12 @@ void main()
         if(u_xlatb21){
             u_xlat33.x = (-u_xlat33.x) * _extraParam1.x;
             u_xlat33.x = u_xlat45 * u_xlat33.x;
+
             u_xlat33.x = u_xlat33.x * 1.44269502;
             u_xlat33.x = exp2(u_xlat33.x);
             u_xlat21 = u_xlat6.y * 0.0149999997;
+
+
             u_xlat9.xyz = u_xlat6.xyz + (-_subRayStep.xyz);
             u_xlat10.xyz = u_xlat9.xyz;
             u_xlat34 = float(1.0);
@@ -384,21 +422,28 @@ void main()
                 u_xlatb48 = _subRayParam.x<u_xlat48;
 #endif
                 if(u_xlatb48){break;}
+
+
                 u_xlat48 = u_xlat10.y;
 #ifdef UNITY_ADRENO_ES3
                 u_xlat48 = min(max(u_xlat48, 0.0), 1.0);
 #else
                 u_xlat48 = clamp(u_xlat48, 0.0, 1.0);
 #endif
+
+
                 u_xlat11.xy = u_xlat10.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
                 u_xlat37.xy = u_xlat11.xy * _PerlinOffsetAndScale.ww;
                 u_xlat16_49 = textureLod(_perlinForSkyCloudTex, u_xlat11.xy, u_xlat41).x;
                 u_xlat16_11 = textureLod(_perlinToDilateWorley, u_xlat37.xy, u_xlat27.y).x;
+
+
                 u_xlat49 = u_xlat16_11 * _Worley2Param.x + u_xlat16_49;
                 u_xlat49 = u_xlat49 * _Worley2Param.y;
                 u_xlat49 = log2(u_xlat49);
                 u_xlat49 = u_xlat49 * _CloudNoiseParam.x;
                 u_xlat49 = exp2(u_xlat49);
+
                 u_xlat49 = (-u_xlat46) * _CloudNoiseParam.z + u_xlat49;
                 u_xlat49 = u_xlat49 / u_xlat8.x;
 #ifdef UNITY_ADRENO_ES3
@@ -406,24 +451,37 @@ void main()
 #else
                 u_xlat49 = clamp(u_xlat49, 0.0, 1.0);
 #endif
+
+
+
                 u_xlat11.x = (-u_xlat48) + u_xlat49;
                 u_xlat11.x = u_xlat11.x * _Worley2Param.z;
                 u_xlat48 = u_xlat48 * _Worley2Param.w;
                 u_xlat48 = min(u_xlat48, 1.0);
+
+
                 u_xlat48 = (-u_xlat48) + 1.0;
+
                 u_xlat48 = (-u_xlat48) + u_xlat49;
                 u_xlat48 = max(u_xlat48, 0.0);
+
                 u_xlat48 = u_xlat48 * u_xlat11.x;
                 u_xlat48 = max(u_xlat48, 0.0);
+
+
+
                 u_xlat48 = u_xlat29 * (-u_xlat48);
                 u_xlat48 = u_xlat48 * 1.44269502;
                 u_xlat48 = exp2(u_xlat48);
+
+
                 u_xlat34 = u_xlat34 * u_xlat48;
                 u_xlat10.xyz = u_xlat10.xyz + (-_subRayStep.xyz);
                 u_xlati47 = u_xlati47 + 1;
             }
             u_xlat8.xyw = vec3(u_xlat21) * _envColor.xyz;
             u_xlat8.xyw = vec3(u_xlat34) * u_xlat4.xyz + u_xlat8.xyw;
+
             u_xlat46 = (-u_xlat33.x) + 1.0;
             u_xlat8.xyw = vec3(u_xlat46) * u_xlat8.xyw;
             u_xlat18.xyz = u_xlat8.xyw * vec3(u_xlat7) + u_xlat18.xyz;

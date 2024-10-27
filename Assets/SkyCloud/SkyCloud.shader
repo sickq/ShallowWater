@@ -15,24 +15,219 @@ Shader "Unlit/SkyCloud"
 
     struct v2f
     {
-        float4 uv : TEXCOORD0;
-        // float4 uv : TEXCOORD0;
         float4 vertex : SV_POSITION;
+        float4 objPos : TEXCOORD0;
+        float3 worldPos : TEXCOORD1;
     };
 
-    sampler2D _MainTex;
-    float4 _MainTex_ST;
 
+    // sampler2D ;
+    UNITY_DECLARE_TEX2DARRAY(_worleyNoiseTex);
+    sampler2D _perlinForSkyCloudTex;
+    sampler2D _perlinToDilateWorley;
+
+    float4 _CloudNoiseParam;
+    float4 _FakeCloudTransmittanceParam;
+    float4 _PerlinOffsetAndScale;
+    float4 _Worley2Param;
+    float4 _WorleyOffsetAndScale;
+    float4 _backPhaseParam;
+    float4 _darkColor;
+    float4 _envColor;
+    float4 _extraParam1;
+    float4 _phaseParam;
+    float4 _sampleParam;
+    float4 _startPosOS;
+    float4 _subRayParam;
+    float4 _subRayStep;
+    float4 _sunColor;
+    float4 _sunDir;
+    float4 invscale;
+    float4 scale;
+    
     v2f vert (appdata v)
     {
         v2f o;
         o.vertex = UnityObjectToClipPos(v.vertex);
+        o.worldPos = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0)).xyz;
+        // o.objPos.w = mul(UNITY_MATRIX_V, float4(o.worldPos, 1.0)).z;
+        o.objPos.xyz = (v.vertex.xyz + float3(0.5f, 0.5f, 0.5f)) * scale.xyz;
         return o;
     }
 
     fixed4 frag (v2f i) : SV_Target
     {
-        return 1;
+        float3 cam2World = i.worldPos - _WorldSpaceCameraPos.xyz;
+        float cam2WorldLength = length(cam2World);
+        float3 cam2OS = i.objPos.xyz - _startPosOS.xyz;
+
+        float3 viewDir = cam2World / cam2WorldLength;
+        float3 osViewDir = cam2OS / cam2WorldLength;
+
+        float2 ddxXZ = ddx(i.worldPos.xz);
+        float sqrddxXZ = dot(ddxXZ, ddxXZ);
+        float2 ddyXZ = ddy(i.worldPos.xz);
+        float sqrddyXZ = dot(ddyXZ, ddyXZ);
+
+        float sqrtddxXZ = sqrt(sqrddxXZ);
+        float sqrtddyXZ = sqrt(sqrddyXZ);
+        
+        float scaleTempValue = sqrtddyXZ * _PerlinOffsetAndScale.z;
+        float perlinForSkyCloudMipmap = max(log2(scaleTempValue * invscale.x * 64.0f), 0);
+
+        scaleTempValue = scaleTempValue * _PerlinOffsetAndScale.w;
+        float perlinToDilateWorleyMipmap = max(log2(scaleTempValue * invscale.x * 128.0f), 0);
+        
+        float worleyNoiseTexMipmap = max(log2(sqrtddxXZ * _CloudNoiseParam.y * invscale.x * 64.0f), 0);
+
+        // float rayCount = scale.y / viewDir.y;
+        float inCloudLength = scale.y / viewDir.y;
+
+        float VoL = dot(osViewDir, _sunDir.xyz);
+        float negVoL = saturate(-VoL);
+        float transmittanceWeight = exp2(log2(negVoL) * _FakeCloudTransmittanceParam.y);
+
+        //_FakeCloudTransmittanceParam.y powValue
+        //_FakeCloudTransmittanceParam.x 权重
+        transmittanceWeight = 1 - transmittanceWeight * _FakeCloudTransmittanceParam.x;
+        transmittanceWeight = transmittanceWeight * _subRayParam.y;
+
+        float phaseValue = _phaseParam.z * VoL + _phaseParam.y;
+        phaseValue = exp2(log2(phaseValue) * 1.5f);
+        phaseValue = _phaseParam.x / phaseValue;
+
+        float backphaseValue = _backPhaseParam.z * VoL + _backPhaseParam.y;
+        backphaseValue = exp2(log2(backphaseValue) * 1.5f);
+        backphaseValue = _backPhaseParam.x / backphaseValue;
+
+        float phaseValueTotal = phaseValue + backphaseValue;
+        float3 lightColor = phaseValueTotal * _sunColor.xyz;
+
+        float cam2EndLength = cam2WorldLength + inCloudLength;
+        float3 osViewDirInCloud = osViewDir.xyz * invscale.xyz;
+
+        float2 camLength = float2(cam2WorldLength, cam2EndLength);
+        camLength = camLength * _sampleParam.xx + _sampleParam.yy;
+        camLength = log(camLength) / _sampleParam.xx;
+
+        float2 camLengthCeil = ceil(camLength);
+        int cam2WorldLengthInt = int(camLengthCeil.x);
+
+        float tempValue = exp(camLengthCeil.x * _sampleParam.x);
+
+        camLengthCeil.x = (camLengthCeil.x - camLength.x);
+        osViewDir.xyz = osViewDir.xyz * camLengthCeil.x;
+        osViewDir.xyz = osViewDir.xyz * tempValue + i.objPos.xyz;
+
+
+        int disCount = int(min(camLengthCeil.y, _sampleParam.w)) - cam2WorldLengthInt;
+        disCount = int(min(float(disCount), _sampleParam.z));
+
+        //TODO 解释
+        float tempValue1 = exp(_sampleParam.x);
+
+        osViewDir.xyz = osViewDir.xyz * invscale.xyz;
+        osViewDir.xyz = saturate(osViewDir.xyz);
+
+        float3 cloudColor = 0;
+
+        float3 rayDir = osViewDir.xyz;
+
+        float rayCount = tempValue;
+
+        float weight = 1;
+
+        for(int i = 0; i < disCount; i++)
+        {
+            if(weight <= 0.001f)
+            {
+                break;
+            }
+
+            float2 perlinForSkyCloudUV = rayDir.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
+            float2 perlinToDilateWorleyUV = perlinForSkyCloudUV * _PerlinOffsetAndScale.ww;
+            float perlinForSkyCloud = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUV, 0, perlinForSkyCloudMipmap)).x;
+            float perlinToDilateWorley = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUV, 0, perlinToDilateWorleyMipmap)).x;
+
+            float noise = perlinToDilateWorley * _Worley2Param.x + perlinForSkyCloud;
+            noise = noise * _Worley2Param.y;
+            noise = exp2(log2(noise) * _CloudNoiseParam.x);
+
+            float3 worleyNoiseUV = 0;
+            worleyNoiseUV.xy = rayDir.xz * _CloudNoiseParam.yy;
+            worleyNoiseUV.z = rayDir.y * _WorleyOffsetAndScale.w;
+            worleyNoiseUV = worleyNoiseUV + _WorleyOffsetAndScale.xzy;
+            float worleyNoise = UNITY_SAMPLE_TEX2DARRAY_LOD(_worleyNoiseTex, worleyNoiseUV, worleyNoiseTexMipmap).x;
+            worleyNoise = saturate(worleyNoise);
+
+            noise = noise - worleyNoise * _CloudNoiseParam.z;
+            float noiseTemp = max(1 - worleyNoise * _CloudNoiseParam.z, 0.0001f);
+            noise = saturate(noise / noiseTemp);
+
+
+            float noiseDisY = noise - rayDir.y;
+            noiseDisY = noiseDisY * _Worley2Param.z;
+
+
+            float tempValue2 = 1 - min(rayDir.y * _Worley2Param.w, 1);
+            noise = noise - tempValue2;
+            noise = max(noise, 0);
+            noise = max(noise * noiseDisY, 0);
+
+
+            if(noise > 0.0001f)
+            {
+                noise = -noise * _extraParam1.x;
+                noise = rayCount * noise;
+                noise = exp(noise);
+                float envColorWeight = rayDir.y * 0.0149999997;
+
+                float3 subRayDir = rayDir - _subRayStep.xyz;
+                float lightWeight = 1.0;
+                for(int j = 0; j < _subRayParam.x; j++)
+                {
+                    float subRayY = saturate(subRayDir.y);
+
+                    float2 perlinForSkyCloudUVLight = subRayDir.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
+                    float2 perlinToDilateWorleyUVLight = perlinForSkyCloudUVLight * _PerlinOffsetAndScale.ww;
+
+                    float perlinForSkyCloudLight = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUVLight, 0, perlinForSkyCloudMipmap)).x;
+                    float perlinToDilateWorleyLight = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUVLight, 0, perlinToDilateWorleyMipmap)).x;
+
+                    float lightNoise = perlinToDilateWorleyLight * _Worley2Param.x + perlinForSkyCloudLight;
+                    lightNoise = lightNoise * _Worley2Param.y;
+
+                    lightNoise = exp2(log2(lightNoise) * _CloudNoiseParam.x);
+                    lightNoise = -worleyNoise * _Worley2Param.x + lightNoise;
+                    lightNoise = saturate(lightNoise / noiseTemp);
+
+                    float lightNoiseY = noise - subRayY;
+                    lightNoiseY = lightNoiseY * _Worley2Param.z;
+                    float tempValue3 = 1 - min(subRayY * _Worley2Param.w, 1);
+
+                    lightNoise = lightNoise - tempValue3;
+                    lightNoise = max(lightNoise, 0);
+                    lightNoise = max(lightNoise * lightNoiseY, 0);
+                    lightNoise = transmittanceWeight * (-lightNoise);
+                    lightNoise = exp(lightNoise);
+
+                    lightWeight = lightWeight * lightNoise;
+
+                    subRayDir = subRayDir + (-_subRayStep.xyz);
+                }
+                float3 envColor = envColorWeight * _envColor.xyz;
+                envColor = lightWeight * lightColor + envColor;
+
+                float lerpValue = 1 - noise;
+                envColor = lerpValue * envColor;
+                cloudColor = envColor * weight + cloudColor;
+                weight = noise * weight;
+            }
+            rayCount = rayCount * tempValue1;
+            rayDir = osViewDirInCloud * rayCount + rayDir;
+        }
+        
+        return float4(cloudColor, 1 - weight);
     }
     
     ENDCG
@@ -41,8 +236,8 @@ Shader "Unlit/SkyCloud"
     SubShader
     {
         Tags { "RenderType"="Opaque" }
-        LOD 100
 
+        Blend SrcAlpha OneMinusSrcAlpha
         Pass
         {
             CGPROGRAM

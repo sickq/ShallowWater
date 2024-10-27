@@ -32,7 +32,7 @@ public class SkyCloud : MonoBehaviour
         Shader.SetGlobalVector("_CloudNoiseParam", new Vector4(0.838f, 261.33331f, 0.55f, 15.00f));
         Shader.SetGlobalVector("_FakeCloudTransmittanceParam", new Vector4(0.30f, 0.10f, 0.50f, 0.00f));
         Shader.SetGlobalVector("_PerlinOffsetAndScale", new Vector4(2.16184f, -1.9157f, 6.50f, 10.00f));
-        Shader.SetGlobalVector("_WorldSpaceCameraPos", new Vector4(483.94421f, 203.22813f, 898.3457f));
+        // Shader.SetGlobalVector("_WorldSpaceCameraPos", new Vector4(483.94421f, 203.22813f, 898.3457f));
         Shader.SetGlobalVector("_Worley2Param", new Vector4(0.66f, 0.61865f, 1.00f, 2.00f));
         Shader.SetGlobalVector("_WorleyOffsetAndScale", new Vector4(18.78573f, 0.00f, -5.15855f, 1.30667f));
         Shader.SetGlobalVector("_backPhaseParam", new Vector4(0.03342f, 1.16f, 0.80f, 0.00f));
