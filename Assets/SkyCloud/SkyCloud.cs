@@ -20,6 +20,22 @@ public class SkyCloud : MonoBehaviour
     [ColorUsage(false, true)] public Color SunColor = Color.white;
     [ColorUsage(false, true)] public Color EnvColor = Color.white;
 
+    [Range(0, 20)] public float perlinForSkyCloudNoiseScale = 6.5f;
+    [Range(0, 20)] public float perlinToDilateWorleyNoiseScale = 10.0f;
+    
+    [Range(-20, 20)] public float perlinNoiseSpeedX = 0.01f;
+    [Range(-20, 20)] public float perlinNoiseSpeedZ = 0.01f;
+    [Range(-2, 2)] public float perlinToDilateWorleyWeight = 0.66f;
+    [Range(-2, 2)] public float perlinNoiseWeight = 0.61865f;
+    [Range(-2, 2)] public float perlinNoiseYWeight = 1.0f;
+    [Range(-10, 10)] public float perlinNoiseYParam = 2.0f;
+    
+    [Range(-5, 5)] public float WorleyNoiseYScale = 1.30667f;
+    [Range(-5, 5)] public float WorleyNoiseXSpeed = 0.01f;
+    [Range(-5, 5)] public float WorleyNoiseYSpeed = 0.01f;
+    [Range(-5, 5)] public float WorleyNoiseZSpeed = 0.01f;
+
+    
     [Header("光照步进次数"), Range(0, 10)] public int SubRayStepCount = 2;
     [Header("光照步进距离"), Range(0, 20)] public int SubRayStepLength = 14;
     [Header("光照传输"), Range(0, 20)] public int SubRayLightTrans = 15;
@@ -47,9 +63,11 @@ public class SkyCloud : MonoBehaviour
         PipelineUtils.ReleaseCommandBuffer(ref cmdBuffer);
     }
 
+    private float currentTime = 0;
     // Update is called once per frame
     void Update()
     {
+        currentTime += Time.deltaTime;
         // cmdBuffer.Clear();
         // Matrix4x4 matrix = Matrix4x4.TRS(new Vector3(camera.transform.position.x,. ), transform.rotation, transform.lossyScale);
         // cmdBuffer.DrawMesh(PrimitiveType.Cube, );
@@ -58,12 +76,21 @@ public class SkyCloud : MonoBehaviour
         Shader.SetGlobalTexture("_perlinForSkyCloudTex", PerlinForSkyCloudTex);
         Shader.SetGlobalTexture("_perlinToDilateWorley", PerlinToDilateWorley);
         
-        Shader.SetGlobalVector("_CloudNoiseParam", new Vector4(0.838f, 261.33331f, 0.55f, 15.00f));
+        Shader.SetGlobalVector("_CloudNoiseParam", new Vector4(0.838f, SkyCloudHeight, 0.55f, 15.00f));
         Shader.SetGlobalVector("_FakeCloudTransmittanceParam", new Vector4(_FakeCloudTransmittanceWeight, _FakeCloudTransmittancePow, 0.50f, 0.00f));
-        Shader.SetGlobalVector("_PerlinOffsetAndScale", new Vector4(2.16184f, -1.9157f, 6.50f, 10.00f));
+        float offsetX = perlinNoiseSpeedX * currentTime;
+        float offsetZ = perlinNoiseSpeedZ * currentTime;
+        Shader.SetGlobalVector("_PerlinOffsetAndScale", new Vector4(offsetX, offsetZ, perlinForSkyCloudNoiseScale, perlinToDilateWorleyNoiseScale));
         // Shader.SetGlobalVector("_WorldSpaceCameraPos", new Vector4(483.94421f, 203.22813f, 898.3457f));
-        Shader.SetGlobalVector("_Worley2Param", new Vector4(0.66f, 0.61865f, 1.00f, 2.00f));
-        Shader.SetGlobalVector("_WorleyOffsetAndScale", new Vector4(18.78573f, 0.00f, -5.15855f, 1.30667f));
+        Shader.SetGlobalVector("_Worley2Param", new Vector4(perlinToDilateWorleyWeight, perlinNoiseWeight, perlinNoiseYWeight, perlinNoiseYParam));
+        
+        float worleyOffsetX = WorleyNoiseXSpeed * currentTime;
+        float worleyOffsetY = WorleyNoiseYSpeed * currentTime;
+        float worleyOffsetZ = WorleyNoiseZSpeed * currentTime;
+        
+        
+        Shader.SetGlobalVector("_WorleyOffsetAndScale", new Vector4(worleyOffsetX, worleyOffsetY, worleyOffsetZ, WorleyNoiseYScale));
+        // Shader.SetGlobalVector("_WorleyOffsetAndScale", new Vector4(18.78573f, 0.00f, -5.15855f, 1.30667f));
         Shader.SetGlobalVector("_phaseParam", new Vector4(0.03815f, 1.04121f, 0.406f, 0.00f));
         Shader.SetGlobalVector("_backPhaseParam", new Vector4(0.03342f, 1.16f, 0.80f, 0.00f));
         Shader.SetGlobalVector("_darkColor", new Vector4(0.13512f, 0.20625f, 0.30227f, 0.19805f));

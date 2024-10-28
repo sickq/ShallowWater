@@ -21,6 +21,8 @@ Shader "Unlit/SkyCloud"
     };
 
     float4 g_AtmosphereLightDirection;
+    float4 g_CameraAerialPerspectiveVolumeParam;
+    UNITY_DECLARE_TEX3D(AtmosphereCameraScatteringVolume);
 
     // sampler2D ;
     UNITY_DECLARE_TEX2DARRAY(_worleyNoiseTex);
@@ -180,13 +182,14 @@ Shader "Unlit/SkyCloud"
             float3 worleyNoiseUV = 0;
             worleyNoiseUV.xy = rayStartPos.xz * _CloudNoiseParam.yy;
             worleyNoiseUV.z = rayStartPos.y * _WorleyOffsetAndScale.w;
-            worleyNoiseUV = worleyNoiseUV + _WorleyOffsetAndScale.xzy;
+            worleyNoiseUV.xyz = worleyNoiseUV.xyz + _WorleyOffsetAndScale.xzy;
             float worleyNoise = UNITY_SAMPLE_TEX2DARRAY_LOD(_worleyNoiseTex, worleyNoiseUV, worleyNoiseTexMipmap).x;
             worleyNoise = saturate(worleyNoise);
 
             noise = noise - worleyNoise * _CloudNoiseParam.z;
             float noiseTemp = max(1 - worleyNoise * _CloudNoiseParam.z, 0.0001f);
             noise = saturate(noise / noiseTemp);
+            return noise;
 
 
             float noiseDisY = noise - rayStartPos.y;
@@ -259,6 +262,8 @@ Shader "Unlit/SkyCloud"
         luma = resultWeight * luma;
 
         cloudColor =  luma * _darkColor.xyz + cloudColor;
+
+        
         cam2WorldLength = cam2WorldLength * _FakeCloudTransmittanceParam.z;
         float2 viewDirXZOffset = viewDir.xz * cam2WorldLength;
         float viewDirYOffset = viewDir.y * cam2WorldLength + _WorldSpaceCameraPos.y;
@@ -272,9 +277,19 @@ Shader "Unlit/SkyCloud"
         atmosTempValue = atmosTempValue / UNITY_PI;
         atmosTempValue = sqrt(atmosTempValue);
 
-        // float test sqrt(dot(viewDirXZOffset, viewDirXZOffset));
+
+        float tempValue11 = sqrt(dot(viewDirXZOffset, viewDirXZOffset));
+        float tempValue12 = viewDirYOffset + g_CameraAerialPerspectiveVolumeParam.x;
+
+        float2 uvYZ = float2(tempValue12, tempValue11) * g_CameraAerialPerspectiveVolumeParam.zy;
+        uvYZ = saturate(uvYZ);
+
+        uvYZ = sqrt(uvYZ);
+        float3 uv = float3(atmosTempValue, uvYZ);
+        float4 atmosphereColor = UNITY_SAMPLE_TEX3D_LOD(AtmosphereCameraScatteringVolume, uv, 0);
+        float4 resultColor = atmosphereColor * resultWeight + float4(cloudColor, resultWeight) * (1 - atmosphereColor.w);
         
-        return float4(cloudColor, 1 - weight);
+        return resultColor;
     }
     
     ENDCG

@@ -92,7 +92,7 @@ namespace Atmosphere
             Shader.SetGlobalTexture("_SkyViewLutTextureL", _skyViewLUT);
             Shader.SetGlobalTexture("AtmosphereCameraScatteringVolume", _cameraVolumeLUT);
             Shader.SetGlobalVector("g_AtmosphereLightDirection", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, mainLight.transform.forward.z, mainLight.transform.forward.y));
-            Shader.SetGlobalVector("g_CameraAerialPerspectiveVolumeParam", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, mainLight.transform.forward.z, mainLight.transform.forward.y));
+            Shader.SetGlobalVector("g_CameraAerialPerspectiveVolumeParam", new Vector4(0.0f, 0.0001f, 0.00033f, 0.15f));
         }
 
         void UpdateConstantBuffer(Camera camera)
