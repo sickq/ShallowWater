@@ -243,6 +243,8 @@ void main()
 
     u_xlat3.x = scale.y / u_xlat0.y;
 
+
+
     //dot(fake normal, lightDir)
     u_xlat16 = dot(u_xlat2.xyz, _sunDir.xyz);
     u_xlat29 = (-u_xlat16);
@@ -496,10 +498,13 @@ void main()
     u_xlat3.x = min(u_xlat3.x, 1.0);
     u_xlat3.x = (-u_xlat3.x) + 1.0;
     u_xlat3.x = u_xlat2.w * u_xlat3.x;
+
+
     u_xlat2.xyz = u_xlat3.xxx * _darkColor.xyz + u_xlat14.xyz;
     u_xlat1.x = u_xlat1.x * _FakeCloudTransmittanceParam.z;
     u_xlat14.xy = u_xlat0.xz * u_xlat1.xx;
     u_xlat1.x = u_xlat0.y * u_xlat1.x + _WorldSpaceCameraPos.xxyz.z;
+
     u_xlat16_12.x = (-u_xlat0.y) * u_xlat0.y + 1.0;
     u_xlat16_12.x = inversesqrt(u_xlat16_12.x);
     u_xlat0.w = (-u_xlat0.x);
@@ -507,6 +512,7 @@ void main()
     u_xlat0.x = u_xlat16_12.x * u_xlat16_25;
     u_xlat0.x = max(u_xlat0.x, -1.0);
     u_xlat0.x = min(u_xlat0.x, 1.0);
+
     u_xlat13 = abs(u_xlat0.x) * abs(u_xlat0.x);
     u_xlat26 = abs(u_xlat0.x) * u_xlat13;
     u_xlat39 = abs(u_xlat0.x) * -0.212114394 + 1.57072878;
@@ -524,6 +530,7 @@ void main()
     u_xlat0.x = (u_xlatb0) ? u_xlat39 : u_xlat13;
     u_xlat0.x = u_xlat0.x * 0.318309873;
     u_xlat0.x = sqrt(u_xlat0.x);
+    
     u_xlat39 = dot(u_xlat14.xy, u_xlat14.xy);
     u_xlat14.y = sqrt(u_xlat39);
     u_xlat14.x = u_xlat1.x + g_CameraAerialPerspectiveVolumeParam.x;
