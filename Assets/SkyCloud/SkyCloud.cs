@@ -49,11 +49,9 @@ public class SkyCloud : MonoBehaviour
     [Header("云透射权重,伪造"), Range(0, 10)] public float _FakeCloudTransmittanceWeight = 0.30f;
 
 
-
-
-
     private CommandBuffer cmdBuffer;
 
+    
     private void OnEnable()
     {
         PipelineUtils.ReleaseCommandBuffer(ref cmdBuffer);
@@ -64,6 +62,7 @@ public class SkyCloud : MonoBehaviour
     {
         PipelineUtils.ReleaseCommandBuffer(ref cmdBuffer);
     }
+
 
     private float currentTime = 0;
     // Update is called once per frame

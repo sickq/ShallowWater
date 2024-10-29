@@ -27,7 +27,17 @@ SubShader {
         #include "Lighting.cginc"
         #include "RenderSkyCommon.hlsl"
 
+        #pragma multi_compile _ SKY_CLOUD_ENABLED
+        #if defined(SKY_CLOUD_ENABLED)
 
+        UNITY_DECLARE_TEX2D(_SkyCloudLowRes);
+        
+        float4 _SkyCloudViewportScale;
+        float4 _blendCloudFogParam;
+        
+        
+        #endif
+        
         uniform half _Exposure;     // HDR exposure
         uniform half3 _GroundColor;
         uniform half _SunSize;
@@ -43,10 +53,11 @@ SubShader {
 
         struct v2f
         {
-            float4  pos             : SV_POSITION;
+            float4 pos             : SV_POSITION;
             float3 vertex : TEXCOORD0;
             float3 posWorld : TEXCOORD1;
-
+            float4 screenPos : TEXCOORD2;
+            
             UNITY_VERTEX_OUTPUT_STEREO
         };
 
@@ -64,6 +75,8 @@ SubShader {
             OUT.posWorld = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0));
             
             OUT.vertex = v.vertex;
+
+            OUT.screenPos = ComputeScreenPos(OUT.pos);
             
             return OUT;
         }
@@ -99,7 +112,7 @@ SubShader {
         
         half4 frag (v2f IN) : SV_Target
         {
-            half3 col = half3(0.0, 0.0, 0.0);
+            half4 col = half4(0.0, 0.0, 0.0, 0.0);
 
             float3 uniformVertPos = normalize(IN.vertex.xyz);
             float reverseY = (1 - uniformVertPos.y) * 0.5f;
@@ -124,7 +137,33 @@ SubShader {
 
             col = tex2D(_SkyViewLutTextureL, tempUV);
 
-            return half4(col, 0.0);
+            #if defined(SKY_CLOUD_ENABLED)
+
+            float scaleY = uniformVertPos.y * 250.0;
+            scaleY = scaleY * scaleY + 2525.0;
+            scaleY = sqrt(scaleY);
+            float blendParam = max(-uniformVertPos.y * 250.0 - scaleY, -uniformVertPos.y * 250.0 + scaleY);
+            float2 screenPos = IN.screenPos.xy / IN.screenPos.w;
+            float2 screenUV = min(screenPos * _SkyCloudViewportScale.xy, _SkyCloudViewportScale.zw);
+            float4 skyCloud = UNITY_SAMPLE_TEX2D_LOD(_SkyCloudLowRes, screenUV, 0);
+
+            blendParam = max(blendParam - _blendCloudFogParam.x, 0);
+            blendParam = -blendParam * _blendCloudFogParam.y;
+            blendParam = exp(blendParam);
+
+            float3 newSkyCloud = blendParam * skyCloud.rgb;
+
+            float lerpValue = 1 - blendParam * skyCloud.a;
+            col.rgb = col.rgb * lerpValue + newSkyCloud;
+            
+            float alpha = blendParam * skyCloud.a - skyCloud.a;
+            alpha = alpha + 1;
+            alpha = alpha - skyCloud.a;
+            alpha = _blendCloudFogParam.z * alpha + skyCloud.a;
+
+            col.a = alpha;
+            #endif
+            return col;
         }
 
         float3 GetSunSunLuminance(float3 WorldDir, float3 sunDir, float intersectGround)

@@ -24,7 +24,6 @@ Shader "Unlit/SkyCloud"
     float4 g_CameraAerialPerspectiveVolumeParam;
     UNITY_DECLARE_TEX3D(AtmosphereCameraScatteringVolume);
 
-    // sampler2D ;
     UNITY_DECLARE_TEX2DARRAY(_worleyNoiseTex);
     sampler2D _perlinForSkyCloudTex;
     sampler2D _perlinToDilateWorley;
@@ -255,12 +254,14 @@ Shader "Unlit/SkyCloud"
 
         cloudColor = max(cloudColor, 0);
         float resultWeight = 1 - weight;
+        return float4(cloudColor, 1 - weight);
         float luma = dot(cloudColor.xyz, float3(0.212599993, 0.715200007, 0.0722000003));
         luma = min(luma, 1);
         luma = 1 - luma;
         luma = resultWeight * luma;
         cloudColor =  luma * _darkColor.xyz + cloudColor;
 
+        return float4(cloudColor, 1 - weight);
         
         cam2WorldLength = cam2WorldLength * _FakeCloudTransmittanceParam.z;
         float2 viewDirXZOffset = viewDir.xz * cam2WorldLength;
