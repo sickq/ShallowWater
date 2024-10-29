@@ -19,6 +19,7 @@ public class SkyCloud : MonoBehaviour
     
     [ColorUsage(false, true)] public Color SunColor = Color.white;
     [ColorUsage(false, true)] public Color EnvColor = Color.white;
+    [ColorUsage(false, true)] public Color DarkColor = new Color(0.13512f, 0.20625f, 0.30227f, 0.19805f);
 
     [Range(0, 20)] public float perlinForSkyCloudNoiseScale = 6.5f;
     [Range(0, 20)] public float perlinToDilateWorleyNoiseScale = 10.0f;
@@ -36,6 +37,10 @@ public class SkyCloud : MonoBehaviour
     [Range(-5, 5)] public float WorleyNoiseZSpeed = 0.01f;
 
     
+    [Header("最大步进次数"), Range(0, 50)] public int maxRayStep = 20;
+    [Header("步进偏移"), Range(0, 2)] public float rayOffset = 1.0f;
+    [Range(0.0001f, 1)] public float rayScale = 0.03f;
+
     [Header("光照步进次数"), Range(0, 10)] public int SubRayStepCount = 2;
     [Header("光照步进距离"), Range(0, 20)] public int SubRayStepLength = 14;
     [Header("光照传输"), Range(0, 20)] public int SubRayLightTrans = 15;
@@ -43,10 +48,7 @@ public class SkyCloud : MonoBehaviour
     [Header("云透射Pow,伪造"), Range(0, 10)] public float _FakeCloudTransmittancePow = 0.10f;
     [Header("云透射权重,伪造"), Range(0, 10)] public float _FakeCloudTransmittanceWeight = 0.30f;
 
-    [Header("最大步进次数"), Range(0, 50)] public int maxRayStep = 20;
-    [Header("步进偏移"), Range(0, 2)] public float rayOffset = 1.0f;
 
-    [Range(0.0001f, 1)] public float rayScale = 0.03f;
 
 
 
@@ -93,7 +95,7 @@ public class SkyCloud : MonoBehaviour
         // Shader.SetGlobalVector("_WorleyOffsetAndScale", new Vector4(18.78573f, 0.00f, -5.15855f, 1.30667f));
         Shader.SetGlobalVector("_phaseParam", new Vector4(0.03815f, 1.04121f, 0.406f, 0.00f));
         Shader.SetGlobalVector("_backPhaseParam", new Vector4(0.03342f, 1.16f, 0.80f, 0.00f));
-        Shader.SetGlobalVector("_darkColor", new Vector4(0.13512f, 0.20625f, 0.30227f, 0.19805f));
+        Shader.SetGlobalVector("_darkColor", DarkColor);
         Shader.SetGlobalVector("_envColor", EnvColor);
         Shader.SetGlobalVector("_extraParam1", new Vector4(0.24f, 0.00f, 0.00f, 0.00f));
         float startPosYOS = -SkyCloudHeight - transform.lossyScale.y / 2;
@@ -109,7 +111,7 @@ public class SkyCloud : MonoBehaviour
         Shader.SetGlobalVector("_subRayParam", new Vector4(SubRayStepCount, SubRayLightTrans, 0.00f, 0.00f));
         
         Shader.SetGlobalVector("_sunColor", SunColor);
-        Shader.SetGlobalVector("_sunDir", -SunLight.transform.forward);
+        Shader.SetGlobalVector("_sunDir", SunLight.transform.forward);
         
         // Shader.SetGlobalVector("_sunColor", new Vector4(7.58063f, 7.58063f, 7.58063f, 7.58063f));
         // Shader.SetGlobalVector("invscale", new Vector4(0.00005f, 0.01f, 0.00005f));

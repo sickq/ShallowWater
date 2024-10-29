@@ -189,9 +189,6 @@ Shader "Unlit/SkyCloud"
             noise = noise - worleyNoise * _CloudNoiseParam.z;
             float noiseTemp = max(1 - worleyNoise * _CloudNoiseParam.z, 0.0001f);
             noise = saturate(noise / noiseTemp);
-            return noise;
-
-
             float noiseDisY = noise - rayStartPos.y;
             noiseDisY = noiseDisY * _Worley2Param.z;
 
@@ -207,9 +204,11 @@ Shader "Unlit/SkyCloud"
                 noise = -noise * _extraParam1.x;
                 noise = rayCount * noise;
                 noise = exp(noise);
+
                 float envColorWeight = rayStartPos.y * 0.0149999997;
 
                 float3 subRayDir = rayStartPos - _subRayStep.xyz;
+                
                 float lightWeight = 1.0;
                 for(int j = 0; j < _subRayParam.x; j++)
                 {
@@ -260,7 +259,6 @@ Shader "Unlit/SkyCloud"
         luma = min(luma, 1);
         luma = 1 - luma;
         luma = resultWeight * luma;
-
         cloudColor =  luma * _darkColor.xyz + cloudColor;
 
         
@@ -287,6 +285,7 @@ Shader "Unlit/SkyCloud"
         uvYZ = sqrt(uvYZ);
         float3 uv = float3(atmosTempValue, uvYZ);
         float4 atmosphereColor = UNITY_SAMPLE_TEX3D_LOD(AtmosphereCameraScatteringVolume, uv, 0);
+        
         float4 resultColor = atmosphereColor * resultWeight + float4(cloudColor, resultWeight) * (1 - atmosphereColor.w);
         
         return resultColor;
