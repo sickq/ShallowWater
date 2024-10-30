@@ -254,21 +254,20 @@ Shader "Unlit/SkyCloud"
 
         cloudColor = max(cloudColor, 0);
         float resultWeight = 1 - weight;
-        return float4(cloudColor, 1 - weight);
         float luma = dot(cloudColor.xyz, float3(0.212599993, 0.715200007, 0.0722000003));
         luma = min(luma, 1);
         luma = 1 - luma;
         luma = resultWeight * luma;
         cloudColor =  luma * _darkColor.xyz + cloudColor;
 
-        return float4(cloudColor, 1 - weight);
         
         cam2WorldLength = cam2WorldLength * _FakeCloudTransmittanceParam.z;
         float2 viewDirXZOffset = viewDir.xz * cam2WorldLength;
         float viewDirYOffset = viewDir.y * cam2WorldLength + _WorldSpaceCameraPos.y;
 
         float xz = 1 - viewDir.y * viewDir.y;
-        
+
+        //TODO 是否归一化
         float atmosTempValue = dot(float2(-viewDir.x, viewDir.z), g_AtmosphereLightDirection.xy);
         atmosTempValue = clamp(atmosTempValue / xz, -1, 1);
         

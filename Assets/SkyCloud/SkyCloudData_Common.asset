@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8169ebceb71a4a4aa4af9786c2d3cba, type: 3}
+  m_Name: SkyCloudData_Common
+  m_EditorClassIdentifier: 
+  SkyCloudShader: {fileID: 4800000, guid: b20c1d34daf712841af54d2abc9756c1, type: 3}
+  SkyCloudDownScale: 4
+  SkyCloudHeight: 211
+  SkyCloudScale: {x: 20000, y: 100, z: 20000}
+  WorleyNoiseTex: {fileID: 18700000, guid: 11bc27ffec3edd146866c79fa53935ef, type: 2}
+  PerlinForSkyCloudTex: {fileID: 2800000, guid: 2fda7930c114cf643be396db77f51e2b, type: 3}
+  PerlinToDilateWorley: {fileID: 2800000, guid: ae13d131523a195459a404bca0f811db, type: 3}
+  SunColor: {r: 7.5, g: 7.5, b: 7.5, a: 7.5}
+  EnvColor: {r: 72.3, g: 72.3, b: 72.3, a: 72.3}
+  DarkColor: {r: 0.13512, g: 0.20625, b: 0.30227, a: 0.19805}
+  perlinForSkyCloudNoiseScale: 6.5
+  perlinToDilateWorleyNoiseScale: 10
+  perlinNoiseDir: {x: 0.7, y: -0.7}
+  perlinNoiseSpeed: 0.0025
+  perlinToDilateWorleyWeight: 0.66
+  perlinNoiseWeight: 0.61865
+  perlinNoiseYWeight: 1
+  perlinNoiseYParam: 2
+  perlinNoisePow: 0.838
+  worleyNoiseDir: {x: 0.4, y: 0, z: -0.6}
+  worleyNoiseSpeed: 0.02
+  WorleyNoiseYScale: 1.30667
+  WorleyNoiseWeight: 0.55
+  maxRayStep: 20
+  rayOffset: 1
+  rayScale: 0.03
+  SubRayStepCount: 2
+  SubRayStepLength: 14
+  SubRayLightTrans: 15
+  lightNoiseParam: 0.24
+  _FakeCloudTransmittancePow: 0.1
+  _FakeCloudTransmittanceWeight: 0.3
+  _FakeCloudTransmittanceOffset: 0.5
+  PhaseScale: 0.406
+  PhaseOffset: 1.04121
+  PhaseInvParam: 0.03815
+  BackPhaseScale: 0.696
+  BackPhaseOffset: 1.16
+  BackPhaseInvParam: 0.03342

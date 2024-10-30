@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.1498212, g: 0.112014696, b: 0.08320749, a: 1}
+  m_IndirectSpecularColor: {r: 0.15074106, g: 0.17170462, b: 0.18379965, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -123,44 +123,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!84 &132024862
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_ForcedFallbackFormat: 4
-  m_DownscaleFallback: 0
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 5
-  m_Width: 480
-  m_Height: 270
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 0
-  m_ColorFormat: 48
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &293152736
 GameObject:
   m_ObjectHideFlags: 0
@@ -374,43 +336,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ff3a3d2676a8f7a46b2c5b538a41c2a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _SkyCloudLowRes: {fileID: 132024862}
-  SkyCloudShader: {fileID: 4800000, guid: b20c1d34daf712841af54d2abc9756c1, type: 3}
-  SkyCloudDownScale: 4
+  skyCloudData: {fileID: 11400000, guid: a81b4c85da9a2b246aad2d913ff880eb, type: 2}
+  _SkyCloudLowRes: {fileID: 1951481062}
   SunLight: {fileID: 2144530143}
   camera: {fileID: 811811774}
-  SkyCloudHeight: 250
-  SkyCloudScale: {x: 20000, y: 100, z: 20000}
-  WorleyNoiseTex: {fileID: 18700000, guid: 11bc27ffec3edd146866c79fa53935ef, type: 2}
-  PerlinForSkyCloudTex: {fileID: 2800000, guid: 2fda7930c114cf643be396db77f51e2b, type: 3}
-  PerlinToDilateWorley: {fileID: 2800000, guid: ae13d131523a195459a404bca0f811db, type: 3}
-  SunColor: {r: 7.5, g: 7.5, b: 7.5, a: 7.5}
-  EnvColor: {r: 72.3, g: 72.3, b: 72.3, a: 72.3}
-  DarkColor: {r: 0.13512, g: 0.20625, b: 0.30227, a: 0.19805}
-  perlinForSkyCloudNoiseScale: 6.5
-  perlinToDilateWorleyNoiseScale: 10
-  perlinNoiseSpeedX: 0.01
-  perlinNoiseSpeedZ: 0.01
-  perlinToDilateWorleyWeight: 0.66
-  perlinNoiseWeight: 0.61865
-  perlinNoiseYWeight: 1
-  perlinNoiseYParam: 2
-  perlinNoisePow: 0.838
-  WorleyNoiseYScale: 1.30667
-  WorleyNoiseXSpeed: 0.01
-  WorleyNoiseYSpeed: 0.01
-  WorleyNoiseZSpeed: 0.01
-  WorleyNoiseWeight: 0.55
-  maxRayStep: 20
-  rayOffset: 1
-  rayScale: 0.03
-  SubRayStepCount: 2
-  SubRayStepLength: 14
-  SubRayLightTrans: 15
-  lightNoiseParam: 0.24
-  _FakeCloudTransmittancePow: 0.1
-  _FakeCloudTransmittanceWeight: 0.3
-  _FakeCloudTransmittanceOffset: 0.5
 --- !u!4 &432630056
 Transform:
   m_ObjectHideFlags: 0
@@ -1645,6 +1574,44 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 474104, guid: d5335c8f26bfe754b960f5d390edcb98, type: 3}
   m_PrefabInstance: {fileID: 1605520744}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &1951481062
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_ForcedFallbackFormat: 4
+  m_DownscaleFallback: 0
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 5
+  m_Width: 480
+  m_Height: 270
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 0
+  m_ColorFormat: 48
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1001 &1969092074
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1805,13 +1772,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2144530142}
   serializedVersion: 2
-  m_LocalRotation: {x: -0.2853268, y: 0.9565752, z: -0.056092124, w: 0.020155255}
+  m_LocalRotation: {x: -0.31460875, y: 0.9267377, z: -0.14578852, w: -0.14465211}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 5.498, y: 175.935, z: -33.413}
+  m_LocalEulerAnglesHint: {x: 21.176, y: 190.903, z: -35.459}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
