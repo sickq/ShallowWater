@@ -32,6 +32,10 @@ namespace Atmosphere
         public float VolumeHeight = 9.0f;
         public float VolumeDepth = 30.0f;
 
+        public float SceneVolumeMaxVertical = 30000;
+        public float SceneVolumeVerticalOffset = 0;
+        public float SceneVolumeMaxHorizontal = 10000;
+
         private CommandBuffer cmdBuffer;
         private LocalKeyword multiScatApproxKeyword;
 
@@ -91,8 +95,14 @@ namespace Atmosphere
 
             Shader.SetGlobalTexture("_SkyViewLutTextureL", _skyViewLUT);
             Shader.SetGlobalTexture("AtmosphereCameraScatteringVolume", _cameraVolumeLUT);
+            float verticalOffset = 0;
+            if (SceneVolumeVerticalOffset > 0)
+            {
+                verticalOffset = 1 / SceneVolumeVerticalOffset;
+            }
             Shader.SetGlobalVector("g_AtmosphereLightDirection", new Vector4(mainLight.transform.forward.x, -mainLight.transform.forward.z, mainLight.transform.forward.z, mainLight.transform.forward.y));
-            Shader.SetGlobalVector("g_CameraAerialPerspectiveVolumeParam", new Vector4(0.0f, 0.0001f, 0.00033f, 0.15f));
+            Shader.SetGlobalVector("g_CameraAerialPerspectiveVolumeParam", new Vector4(verticalOffset, 1 / SceneVolumeMaxHorizontal, 1 / SceneVolumeMaxVertical, 0.15f));
+            // Shader.SetGlobalVector("g_CameraAerialPerspectiveVolumeParam", new Vector4(0.0f, 0.0001f, 0.00033f, 0.15f));
         }
 
         void UpdateConstantBuffer(Camera camera)

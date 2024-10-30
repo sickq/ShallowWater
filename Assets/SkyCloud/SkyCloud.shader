@@ -305,7 +305,6 @@ Shader "Unlit/SkyCloud"
     {
         Tags { "RenderType"="Opaque" }
 
-        Blend One OneMinusSrcAlpha
         Pass
         {
             CGPROGRAM
