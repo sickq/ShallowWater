@@ -85,7 +85,7 @@ Shader "Unlit/SkyCloud"
         return FastATan(y / x) + (y >= 0.0 ? UNITY_PI : -UNITY_PI) * (x < 0.0);
     }
 
-    fixed4 frag (v2f i) : SV_Target
+    half4 frag (v2f i) : SV_Target
     {
         float3 cam2World = i.worldPos - _WorldSpaceCameraPos.xyz;
         float cam2WorldLength = length(cam2World);
@@ -93,6 +93,7 @@ Shader "Unlit/SkyCloud"
 
         float3 viewDir = cam2World / cam2WorldLength;
         float3 osViewDir = cam2OS / cam2WorldLength;
+
 
         float2 ddxXZ = ddx(i.worldPos.xz);
         float sqrddxXZ = dot(ddxXZ, ddxXZ);
@@ -121,15 +122,20 @@ Shader "Unlit/SkyCloud"
 
         transmittanceWeight = transmittanceWeight * _subRayParam.y;
 
+        // return VoL;
         float phaseValue = _phaseParam.z * VoL + _phaseParam.y;
         phaseValue = pow(phaseValue, 1.5f);
+        phaseValue = max(phaseValue, 0.0001f);
         phaseValue = _phaseParam.x / phaseValue;
 
         float backphaseValue = _backPhaseParam.z * VoL + _backPhaseParam.y;
         backphaseValue = pow(backphaseValue, 1.5f);
+        backphaseValue = max(backphaseValue, 0.0001f);
         backphaseValue = _backPhaseParam.x / backphaseValue;
 
         float phaseValueTotal = phaseValue + backphaseValue;
+        phaseValueTotal = min(phaseValueTotal, 1);
+
         float3 lightColor = phaseValueTotal * _sunColor.xyz;
 
         float cam2EndLength = cam2WorldLength + inCloudLength;
@@ -285,6 +291,7 @@ Shader "Unlit/SkyCloud"
         uvYZ = sqrt(uvYZ);
         float3 uv = float3(atmosTempValue, uvYZ);
         float4 atmosphereColor = UNITY_SAMPLE_TEX3D_LOD(AtmosphereCameraScatteringVolume, uv, 0);
+        // return float4(atmosphereColor.xyz, 1);
         
         float4 resultColor = atmosphereColor * resultWeight + float4(cloudColor, resultWeight) * (1 - atmosphereColor.w);
         

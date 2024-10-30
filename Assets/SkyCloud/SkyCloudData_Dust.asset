@@ -17,12 +17,12 @@ MonoBehaviour:
   SkyCloudHeight: 211
   SkyCloudScale: {x: 20000, y: 100, z: 20000}
   WorleyNoiseTex: {fileID: 18700000, guid: 11bc27ffec3edd146866c79fa53935ef, type: 2}
-  PerlinForSkyCloudTex: {fileID: 2800000, guid: 2c11db98459b436459a9240dfa39f6f7, type: 3}
+  PerlinForSkyCloudTex: {fileID: 2800000, guid: 2fda7930c114cf643be396db77f51e2b, type: 3}
   PerlinToDilateWorley: {fileID: 2800000, guid: ae13d131523a195459a404bca0f811db, type: 3}
-  SunColor: {r: 7.5, g: 7.5, b: 7.5, a: 7.5}
-  EnvColor: {r: 72.3, g: 72.3, b: 72.3, a: 72.3}
-  DarkColor: {r: 0.13512, g: 0.20625, b: 0.30227, a: 0.19805}
-  perlinForSkyCloudNoiseScale: 6.5
+  SunColor: {r: 10.018, g: 2.16604, b: 0, a: 7.5}
+  EnvColor: {r: 75.47, g: 54.63, b: 35.9, a: 72.3}
+  DarkColor: {r: 0.09219, g: 0.09219, b: 0.09219, a: 0.19805}
+  perlinForSkyCloudNoiseScale: 4.27
   perlinToDilateWorleyNoiseScale: 10
   perlinNoiseDir: {x: 0.7, y: -0.7}
   perlinNoiseSpeed: 0.0025
@@ -45,9 +45,9 @@ MonoBehaviour:
   _FakeCloudTransmittancePow: 0.1
   _FakeCloudTransmittanceWeight: 0.3
   _FakeCloudTransmittanceOffset: 0.5
-  PhaseScale: 0.406
-  PhaseOffset: 1.04121
-  PhaseInvParam: 0.03815
-  BackPhaseScale: 0.696
-  BackPhaseOffset: 1.16
-  BackPhaseInvParam: 0.03342
+  PhaseScale: 1.6
+  PhaseOffset: 1.64
+  PhaseInvParam: 0.01432
+  BackPhaseScale: 0.4
+  BackPhaseOffset: 1.04
+  BackPhaseInvParam: 0.0382

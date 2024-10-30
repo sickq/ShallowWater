@@ -32,7 +32,7 @@ MonoBehaviour:
   perlinNoiseYParam: 2
   perlinNoisePow: 0.838
   worleyNoiseDir: {x: 0.4, y: 0, z: -0.6}
-  worleyNoiseSpeed: 0.02
+  worleyNoiseSpeed: 0.08
   WorleyNoiseYScale: 1.30667
   WorleyNoiseWeight: 0.55
   maxRayStep: 20
