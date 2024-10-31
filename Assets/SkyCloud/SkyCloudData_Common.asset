@@ -24,15 +24,15 @@ MonoBehaviour:
   DarkColor: {r: 0.13512, g: 0.20625, b: 0.30227, a: 0.19805}
   perlinForSkyCloudNoiseScale: 6.5
   perlinToDilateWorleyNoiseScale: 10
-  perlinNoiseDir: {x: 0.7, y: -0.7}
-  perlinNoiseSpeed: 0.0025
+  perlinNoiseDir: {x: 0.001, y: -0.001}
+  perlinNoiseSpeed: 0.0001
   perlinToDilateWorleyWeight: 0.66
   perlinNoiseWeight: 0.61865
   perlinNoiseYWeight: 1
   perlinNoiseYParam: 2
   perlinNoisePow: 0.838
   worleyNoiseDir: {x: 0.4, y: 0, z: -0.6}
-  worleyNoiseSpeed: 0.08
+  worleyNoiseSpeed: 0.05
   WorleyNoiseYScale: 1.30667
   WorleyNoiseWeight: 0.55
   maxRayStep: 20

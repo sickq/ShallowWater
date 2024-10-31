@@ -29,7 +29,7 @@ MonoBehaviour:
   AbsorptionExtinctionColor: {r: 0.0181, g: 0.00699, b: 0, a: 1}
   AbsorptionExtinctionLength: 1
   GroundAlbedo: {r: 0.7433963, g: 0.7433963, b: 0.7433963, a: 1}
-  AtmosphereColorOffsetWeight: 0
+  AtmosphereColorOffsetWeight: 1
   AtmosphereColor1: {r: 0.17012, g: 0.04081, b: 0.03251, a: 1}
   AtmosphereColor2: {r: 0.82988, g: 0.95919, b: 0.96749, a: 1}
   AbsorptionDensity0LayerWidth: 25
