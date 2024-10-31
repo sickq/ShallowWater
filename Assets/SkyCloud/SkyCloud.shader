@@ -85,6 +85,48 @@ Shader "Unlit/SkyCloud"
         return FastATan(y / x) + (y >= 0.0 ? UNITY_PI : -UNITY_PI) * (x < 0.0);
     }
 
+    float SamplePerlinNoise(float3 rayPos, float perlinSkyMipmap, float perlinDilateMipmap)
+    {
+        float2 perlinForSkyCloudUV = rayPos.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
+        float2 perlinToDilateWorleyUV = perlinForSkyCloudUV * _PerlinOffsetAndScale.ww;
+        float perlinForSkyCloud = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUV, 0, perlinSkyMipmap)).x;
+        float perlinToDilateWorley = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUV, 0, perlinDilateMipmap)).x;
+
+        float noise = perlinToDilateWorley * _Worley2Param.x + perlinForSkyCloud;
+        noise = noise * _Worley2Param.y;
+        noise = pow(noise, _CloudNoiseParam.x);
+
+        return noise;
+    }
+
+    float SampleWorleyNoise(float3 rayPos, float worleyNoiseMipmap)
+    {
+                float3 worleyNoiseUV = 0;
+        worleyNoiseUV.xy = rayPos.xz * _CloudNoiseParam.yy;
+        worleyNoiseUV.z = rayPos.y * _WorleyOffsetAndScale.w;
+        worleyNoiseUV.xyz = worleyNoiseUV.xyz + _WorleyOffsetAndScale.xzy;
+        float worleyNoise = UNITY_SAMPLE_TEX2DARRAY_LOD(_worleyNoiseTex, worleyNoiseUV, worleyNoiseMipmap).x;
+        worleyNoise = saturate(worleyNoise);
+        return worleyNoise;
+    }
+
+    float BlendPerlinWorleyNoise(float rayPosY, float noise, float worleyNoise)
+    {
+        noise = noise - worleyNoise * _CloudNoiseParam.z;
+        float noiseTemp = max(1 - worleyNoise * _CloudNoiseParam.z, 0.0001f);
+        noise = saturate(noise / noiseTemp);
+        float noiseDisY = noise - rayPosY;
+        noiseDisY = noiseDisY * _Worley2Param.z;
+
+
+        float tempValue2 = 1 - min(rayPosY * _Worley2Param.w, 1);
+        noise = noise - tempValue2;
+        noise = max(noise, 0);
+        noise = max(noise * noiseDisY, 0);
+        return noise;
+    }
+
+    
     half4 frag (v2f i) : SV_Target
     {
         float3 cam2World = i.worldPos - _WorldSpaceCameraPos.xyz;
@@ -174,36 +216,39 @@ Shader "Unlit/SkyCloud"
             {
                 break;
             }
+            
+            float perlinNoise = SamplePerlinNoise(rayStartPos, perlinForSkyCloudMipmap, perlinToDilateWorleyMipmap);
+            float worleyNoise = SampleWorleyNoise(rayStartPos, worleyNoiseTexMipmap);
+            float noise = BlendPerlinWorleyNoise(rayStartPos.y, perlinNoise, worleyNoise);
 
-            float2 perlinForSkyCloudUV = rayStartPos.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
-            float2 perlinToDilateWorleyUV = perlinForSkyCloudUV * _PerlinOffsetAndScale.ww;
-            float perlinForSkyCloud = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUV, 0, perlinForSkyCloudMipmap)).x;
-            float perlinToDilateWorley = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUV, 0, perlinToDilateWorleyMipmap)).x;
-
-            float noise = perlinToDilateWorley * _Worley2Param.x + perlinForSkyCloud;
-            noise = noise * _Worley2Param.y;
-            noise = pow(noise, _CloudNoiseParam.x);
-
-            float3 worleyNoiseUV = 0;
-            worleyNoiseUV.xy = rayStartPos.xz * _CloudNoiseParam.yy;
-            worleyNoiseUV.z = rayStartPos.y * _WorleyOffsetAndScale.w;
-            worleyNoiseUV.xyz = worleyNoiseUV.xyz + _WorleyOffsetAndScale.xzy;
-            float worleyNoise = UNITY_SAMPLE_TEX2DARRAY_LOD(_worleyNoiseTex, worleyNoiseUV, worleyNoiseTexMipmap).x;
-            worleyNoise = saturate(worleyNoise);
-
-            noise = noise - worleyNoise * _CloudNoiseParam.z;
-            float noiseTemp = max(1 - worleyNoise * _CloudNoiseParam.z, 0.0001f);
-            noise = saturate(noise / noiseTemp);
-            float noiseDisY = noise - rayStartPos.y;
-            noiseDisY = noiseDisY * _Worley2Param.z;
-
-
-            float tempValue2 = 1 - min(rayStartPos.y * _Worley2Param.w, 1);
-            noise = noise - tempValue2;
-            noise = max(noise, 0);
-            noise = max(noise * noiseDisY, 0);
-
-
+            // float2 perlinForSkyCloudUV = rayStartPos.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
+            // float2 perlinToDilateWorleyUV = perlinForSkyCloudUV * _PerlinOffsetAndScale.ww;
+            // float perlinForSkyCloud = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUV, 0, perlinForSkyCloudMipmap)).x;
+            // float perlinToDilateWorley = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUV, 0, perlinToDilateWorleyMipmap)).x;
+            //
+            // float noise = perlinToDilateWorley * _Worley2Param.x + perlinForSkyCloud;
+            // noise = noise * _Worley2Param.y;
+            // noise = pow(noise, _CloudNoiseParam.x);
+            //
+            // float3 worleyNoiseUV = 0;
+            // worleyNoiseUV.xy = rayStartPos.xz * _CloudNoiseParam.yy;
+            // worleyNoiseUV.z = rayStartPos.y * _WorleyOffsetAndScale.w;
+            // worleyNoiseUV.xyz = worleyNoiseUV.xyz + _WorleyOffsetAndScale.xzy;
+            // float worleyNoise = UNITY_SAMPLE_TEX2DARRAY_LOD(_worleyNoiseTex, worleyNoiseUV, worleyNoiseTexMipmap).x;
+            // worleyNoise = saturate(worleyNoise);
+            //
+            // noise = noise - worleyNoise * _CloudNoiseParam.z;
+            // float noiseTemp = max(1 - worleyNoise * _CloudNoiseParam.z, 0.0001f);
+            // noise = saturate(noise / noiseTemp);
+            // float noiseDisY = noise - rayStartPos.y;
+            // noiseDisY = noiseDisY * _Worley2Param.z;
+            //
+            //
+            // float tempValue2 = 1 - min(rayStartPos.y * _Worley2Param.w, 1);
+            // noise = noise - tempValue2;
+            // noise = max(noise, 0);
+            // noise = max(noise * noiseDisY, 0);
+            
             if(noise > 0.0001f)
             {
                 noise = -noise * _extraParam1.x;
@@ -219,26 +264,32 @@ Shader "Unlit/SkyCloud"
                 {
                     float subRayY = saturate(subRayDir.y);
 
-                    float2 perlinForSkyCloudUVLight = subRayDir.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
-                    float2 perlinToDilateWorleyUVLight = perlinForSkyCloudUVLight * _PerlinOffsetAndScale.ww;
+                    float perlinNoise = SamplePerlinNoise(subRayDir, perlinForSkyCloudMipmap, perlinToDilateWorleyMipmap);
+                    float worleyNoiseLight = worleyNoise;
+                    float lightNoise = BlendPerlinWorleyNoise(subRayY, perlinNoise, worleyNoiseLight);
+                    
+                    // float2 perlinForSkyCloudUVLight = subRayDir.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
+                    // float2 perlinToDilateWorleyUVLight = perlinForSkyCloudUVLight * _PerlinOffsetAndScale.ww;
+                    //
+                    // float perlinForSkyCloudLight = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUVLight, 0, perlinForSkyCloudMipmap)).x;
+                    // float perlinToDilateWorleyLight = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUVLight, 0, perlinToDilateWorleyMipmap)).x;
+                    //
+                    // float lightNoise = perlinToDilateWorleyLight * _Worley2Param.x + perlinForSkyCloudLight;
+                    // lightNoise = lightNoise * _Worley2Param.y;
+                    //
+                    // lightNoise = pow(lightNoise, _CloudNoiseParam.x);
+                    // lightNoise = -worleyNoise * _CloudNoiseParam.z + lightNoise;
+                    // lightNoise = saturate(lightNoise / noiseTemp);
+                    //
+                    // float lightNoiseY = lightNoise - subRayY;
+                    // lightNoiseY = lightNoiseY * _Worley2Param.z;
+                    // float tempValue3 = 1 - min(subRayY * _Worley2Param.w, 1);
+                    //
+                    // lightNoise = lightNoise - tempValue3;
+                    // lightNoise = max(lightNoise, 0);
+                    // lightNoise = max(lightNoise * lightNoiseY, 0);
 
-                    float perlinForSkyCloudLight = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUVLight, 0, perlinForSkyCloudMipmap)).x;
-                    float perlinToDilateWorleyLight = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUVLight, 0, perlinToDilateWorleyMipmap)).x;
-
-                    float lightNoise = perlinToDilateWorleyLight * _Worley2Param.x + perlinForSkyCloudLight;
-                    lightNoise = lightNoise * _Worley2Param.y;
-
-                    lightNoise = pow(lightNoise, _CloudNoiseParam.x);
-                    lightNoise = -worleyNoise * _Worley2Param.x + lightNoise;
-                    lightNoise = saturate(lightNoise / noiseTemp);
-
-                    float lightNoiseY = noise - subRayY;
-                    lightNoiseY = lightNoiseY * _Worley2Param.z;
-                    float tempValue3 = 1 - min(subRayY * _Worley2Param.w, 1);
-
-                    lightNoise = lightNoise - tempValue3;
-                    lightNoise = max(lightNoise, 0);
-                    lightNoise = max(lightNoise * lightNoiseY, 0);
+                    
                     lightNoise = transmittanceWeight * (-lightNoise);
                     lightNoise = exp(lightNoise);
 
