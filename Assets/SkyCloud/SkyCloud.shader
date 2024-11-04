@@ -26,11 +26,14 @@ Shader "Unlit/SkyCloud"
 
     UNITY_DECLARE_TEX2DARRAY(_worleyNoiseTex);
     sampler2D _perlinForSkyCloudTex;
+    sampler2D _perlinForSkyCloudTex2;
     sampler2D _perlinToDilateWorley;
 
     float4 _CloudNoiseParam;
     float4 _FakeCloudTransmittanceParam;
     float4 _PerlinOffsetAndScale;
+    float4 _PerlinOffsetAndScale2;
+    float4 _perlinRepeat2Param;
     float4 _Worley2Param;
     float4 _WorleyOffsetAndScale;
     float4 _backPhaseParam;
@@ -85,12 +88,22 @@ Shader "Unlit/SkyCloud"
         return FastATan(y / x) + (y >= 0.0 ? UNITY_PI : -UNITY_PI) * (x < 0.0);
     }
 
-    float SamplePerlinNoise(float3 rayPos, float perlinSkyMipmap, float perlinDilateMipmap)
+    float SamplePerlinNoise(float3 rayPos, float perlinSkyMipmap, float perlinDilateMipmap, float perlinSkyMipmap2, float perlinDilateMipmap2)
     {
         float2 perlinForSkyCloudUV = rayPos.xz * _PerlinOffsetAndScale.zz + _PerlinOffsetAndScale.xy;
         float2 perlinToDilateWorleyUV = perlinForSkyCloudUV * _PerlinOffsetAndScale.ww;
         float perlinForSkyCloud = tex2Dlod(_perlinForSkyCloudTex, float4(perlinForSkyCloudUV, 0, perlinSkyMipmap)).x;
         float perlinToDilateWorley = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUV, 0, perlinDilateMipmap)).x;
+
+        #if defined(_SKY_CLOUD_LERP)
+        float2 perlinForSkyCloudUV2 = rayPos.xz * _PerlinOffsetAndScale2.zz + _PerlinOffsetAndScale2.xy;
+        float2 perlinToDilateWorleyUV2 = perlinForSkyCloudUV2 * _PerlinOffsetAndScale2.ww;
+        float perlinForSkyCloud2 = tex2Dlod(_perlinForSkyCloudTex2, float4(perlinForSkyCloudUV2, 0, perlinSkyMipmap2)).x;
+        float perlinToDilateWorley2 = tex2Dlod(_perlinToDilateWorley, float4(perlinToDilateWorleyUV2, 0, perlinDilateMipmap2)).x;
+
+        perlinForSkyCloud = lerp(perlinForSkyCloud, perlinForSkyCloud2, _perlinRepeat2Param.x);
+        perlinToDilateWorley = lerp(perlinToDilateWorley, perlinToDilateWorley2, _perlinRepeat2Param.x);
+        #endif
 
         float noise = perlinToDilateWorley * _Worley2Param.x + perlinForSkyCloud;
         noise = noise * _Worley2Param.y;
@@ -150,6 +163,16 @@ Shader "Unlit/SkyCloud"
 
         scaleTempValue = scaleTempValue * _PerlinOffsetAndScale.w;
         float perlinToDilateWorleyMipmap = max(log2(scaleTempValue * invscale.x * 128.0f), 0);
+
+        float perlinForSkyCloudMipmap2 = 0;
+        float perlinToDilateWorleyMipmap2 = 0;
+        #if defined(_SKY_CLOUD_LERP)
+        scaleTempValue = sqrtddyXZ * _PerlinOffsetAndScale2.z;
+        perlinForSkyCloudMipmap2 = max(log2(scaleTempValue * invscale.x * 64.0f), 0);
+        
+        scaleTempValue = scaleTempValue * _PerlinOffsetAndScale.w;
+        perlinToDilateWorleyMipmap2 = max(log2(scaleTempValue * invscale.x * 128.0f), 0);
+        #endif
         
         float worleyNoiseTexMipmap = max(log2(sqrtddxXZ * _CloudNoiseParam.y * invscale.x * 64.0f), 0);
 
@@ -217,7 +240,7 @@ Shader "Unlit/SkyCloud"
                 break;
             }
             
-            float perlinNoise = SamplePerlinNoise(rayStartPos, perlinForSkyCloudMipmap, perlinToDilateWorleyMipmap);
+            float perlinNoise = SamplePerlinNoise(rayStartPos, perlinForSkyCloudMipmap, perlinToDilateWorleyMipmap, perlinForSkyCloudMipmap2, perlinToDilateWorleyMipmap2);
             float worleyNoise = SampleWorleyNoise(rayStartPos, worleyNoiseTexMipmap);
             float noise = BlendPerlinWorleyNoise(rayStartPos.y, perlinNoise, worleyNoise);
 
@@ -236,7 +259,7 @@ Shader "Unlit/SkyCloud"
                 {
                     float subRayY = saturate(subRayDir.y);
 
-                    float perlinNoise = SamplePerlinNoise(subRayDir, perlinForSkyCloudMipmap, perlinToDilateWorleyMipmap);
+                    float perlinNoise = SamplePerlinNoise(subRayDir, perlinForSkyCloudMipmap, perlinToDilateWorleyMipmap, perlinForSkyCloudMipmap2, perlinToDilateWorleyMipmap2);
                     float worleyNoiseLight = worleyNoise;
                     float lightNoise = BlendPerlinWorleyNoise(subRayY, perlinNoise, worleyNoiseLight);
                     
@@ -309,6 +332,8 @@ Shader "Unlit/SkyCloud"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+
+            #pragma multi_compile _ _SKY_CLOUD_LERP
             
             ENDCG
         }
