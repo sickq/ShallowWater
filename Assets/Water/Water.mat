@@ -1,0 +1,132 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Water
+  m_Shader: {fileID: 4800000, guid: ed83dd9532ab7cc49ba05c646f28fce0, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 2550
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailAlbedoMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailNormalMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _OcclusionMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WaterFallEffect:
+        m_Texture: {fileID: 2800000, guid: 04f58e2ed5e23a841af6f6a974c9200e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WaterFoam:
+        m_Texture: {fileID: 2800000, guid: 5c843f4cd78158f4eaea36d8bd1d6b36, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WaterNormal:
+        m_Texture: {fileID: 2800000, guid: f37db8a420e8e7d49a78ab070465e2a8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BackfaceAlpha: 1
+    - _BigCascadeAngle: 0.1
+    - _BigCascadeAngleFalloff: 1
+    - _BumpScale: 1
+    - _CleanFalloffMultiply: 3
+    - _CleanFalloffPower: 3
+    - _Cutoff: 0.5
+    - _DetailNormalMapScale: 1
+    - _Distortion: 0.1
+    - _DstBlend: 0
+    - _EnvIntensity: 1
+    - _FoamIntensity: 0.996
+    - _GlobalTiling: 3
+    - _GlossMapScale: 1
+    - _Glossiness: 0.5
+    - _GlossyReflections: 1
+    - _MacroWaveNormalScale: 0.1
+    - _Metallic: 0
+    - _MicroWaveNormalScale: 0.1
+    - _MinWaterDepth: 0
+    - _Mode: 0
+    - _NormalScale: 0.1
+    - _OcclusionStrength: 1
+    - _Parallax: 0.02
+    - _ShadowDistort: 0.708
+    - _ShalowFalloffMultiply: 0.5
+    - _ShalowFalloffPower: 0.5
+    - _SmallCascadeAngle: 1
+    - _SmallCascadeAngleFalloff: 1
+    - _SmoothnessTextureChannel: 0
+    - _SpecularHighlights: 1
+    - _SrcBlend: 1
+    - _UVSec: 0
+    - _WaterFallAlpha: 1
+    - _WaterFallEffectAlpha: 1
+    - _WaterSmoothness: 0.785
+    - _WaterSpecularClose: 0.77
+    - _WorldTiling: 0
+    - _ZWrite: 1
+    - gEdgeDepth: 12.8
+    - gFinalAlpha: 1
+    m_Colors:
+    - _AmbientColor: {r: 0.5768672, g: 0.90188676, b: 0.90188676, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DeepColor: {r: 0.10301882, g: 0.18314464, b: 0.3433962, a: 1}
+    - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _EnvColor: {r: 0.31015307, g: 0.3539918, b: 0.4792453, a: 0}
+    - _MicroWaveTiling: {r: 3, g: 3, b: 1, a: 1}
+    - _ShalowColor: {r: 0.32145953, g: 0.44886076, b: 0.5698112, a: 1}
+    - _SlowWaterSpeed: {r: -0.4, g: 0, b: -0.02, a: 0}
+    - _SlowWaterTiling: {r: 10, g: 10, b: 1, a: 1}
+    - _TilingSpeedFoam: {r: 100, g: 100, b: 1, a: 1}
+    - _UnderWaterColor: {r: 1, g: 1, b: 1, a: 1}
+    - _WaterFallColor: {r: 1, g: 1, b: 1, a: 1}
+    - _WaterFallEffectTiling: {r: 2.09, g: 1, b: 0, a: -5.54}
+    - _WaterFallEffectTiling2: {r: 1, g: 0.95, b: 0.46, a: -2.32}
+  m_BuildTextureStacks: []

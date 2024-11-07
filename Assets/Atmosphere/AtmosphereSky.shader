@@ -25,18 +25,10 @@ SubShader {
 
         #include "UnityCG.cginc"
         #include "Lighting.cginc"
-        #include "RenderSkyCommon.hlsl"
+        // #include "RenderSkyCommon.hlsl"
+        #include "Assets/Shaders/Atmosphere.hlsl"
 
         #pragma multi_compile _ SKY_CLOUD_ENABLED
-        #if defined(SKY_CLOUD_ENABLED)
-
-        UNITY_DECLARE_TEX2D(_SkyCloudLowRes);
-        
-        float4 _SkyCloudViewportScale;
-        float4 _blendCloudFogParam;
-        
-        
-        #endif
         
         uniform half _Exposure;     // HDR exposure
         uniform half3 _GroundColor;
@@ -60,11 +52,6 @@ SubShader {
             
             UNITY_VERTEX_OUTPUT_STEREO
         };
-
-
-        float4 g_AtmosphereLightDirection;
-
-        sampler2D _SkyViewLutTextureL;
         
         v2f vert (appdata_t v)
         {
@@ -75,94 +62,24 @@ SubShader {
             OUT.posWorld = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0));
             
             OUT.vertex = v.vertex;
-
             OUT.screenPos = ComputeScreenPos(OUT.pos);
             
             return OUT;
         }
 
-        // max absolute error 1.3x10^-3
-        // Eberly's odd polynomial degree 5 - respect bounds
-        // 4 VGPR, 14 FR (10 FR, 1 QR), 2 scalar
-        // input [0, infinity] and output [0, PI/2]
-        float FastATanPos(float x)
-        {
-            float t0 = (x < 1.0) ? x : 1.0 / x;
-            float t1 = t0 * t0;
-            float poly = 0.0872929;
-            poly = -0.301895 + poly * t1;
-            poly = 1.0 + poly * t1;
-            poly = poly * t0;
-            return (x < 1.0) ? poly : UNITY_HALF_PI - poly;
-        }
-
-        // 4 VGPR, 16 FR (12 FR, 1 QR), 2 scalar
-        // input [-infinity, infinity] and output [-PI/2, PI/2]
-        float FastATan(float x)
-        {
-            float t0 = FastATanPos(abs(x));
-            return (x < 0.0) ? -t0 : t0;
-        }
-
-        float FastAtan2(float y, float x)
-        {
-            return FastATan(y / x) + (y >= 0.0 ? UNITY_PI : -UNITY_PI) * (x < 0.0);
-        }
-
-        
         half4 frag (v2f IN) : SV_Target
         {
             half4 col = half4(0.0, 0.0, 0.0, 0.0);
 
             float3 uniformVertPos = normalize(IN.vertex.xyz);
-            float reverseY = (1 - uniformVertPos.y) * 0.5f;
-            
-            float xz = 1 - uniformVertPos.y * uniformVertPos.y;
-            xz = sqrt(xz);
 
-            float tempValue = dot(float2(-uniformVertPos.x, uniformVertPos.z), g_AtmosphereLightDirection.xy);
-            tempValue = clamp(tempValue / xz, -1, 1);
-
-            tempValue = acos(tempValue);
-            tempValue = tempValue / UNITY_PI;
-            tempValue = sqrt(tempValue);
-
-            float2 tempUV = float2(tempValue, reverseY);
-            tempUV = (tempUV + float2(0.00520833349, 0.00480769249)) * float2(0.989690721, 0.990476191);
-
-            float maxXZ = max(abs(uniformVertPos.z), abs(uniformVertPos.x));
-            float minXZ = min(abs(uniformVertPos.z), abs(uniformVertPos.x));
-
-            float atan = FastAtan2(uniformVertPos.x, uniformVertPos.z);
-
-            col = tex2D(_SkyViewLutTextureL, tempUV);
+            col = CalculateSky(uniformVertPos);
 
             #if defined(SKY_CLOUD_ENABLED)
-
-            float scaleY = uniformVertPos.y * 250.0;
-            scaleY = scaleY * scaleY + 2525.0;
-            scaleY = sqrt(scaleY);
-            float blendParam = max(-uniformVertPos.y * 250.0 - scaleY, -uniformVertPos.y * 250.0 + scaleY);
             float2 screenPos = IN.screenPos.xy / IN.screenPos.w;
-            float2 screenUV = min(screenPos * _SkyCloudViewportScale.xy, _SkyCloudViewportScale.zw);
-            float4 skyCloud = UNITY_SAMPLE_TEX2D_LOD(_SkyCloudLowRes, screenUV, 0);
-
-            blendParam = max(blendParam - _blendCloudFogParam.x, 0);
-            blendParam = -blendParam * _blendCloudFogParam.y;
-            blendParam = exp(blendParam);
-
-            float3 newSkyCloud = blendParam * skyCloud.rgb;
-
-            float lerpValue = 1 - blendParam * skyCloud.a;
-            col.rgb = col.rgb * lerpValue + newSkyCloud;
-            
-            float alpha = blendParam * skyCloud.a - skyCloud.a;
-            alpha = alpha + 1;
-            alpha = alpha - skyCloud.a;
-            alpha = _blendCloudFogParam.z * alpha + skyCloud.a;
-
-            col.a = alpha;
+            col = AppendSkyCloud(col, uniformVertPos, screenPos);
             #endif
+            
             return col;
         }
 
@@ -179,25 +96,25 @@ SubShader {
 	        return 0;
         }
         
-        half4 fragUE(v2f IN) : SV_Target
-        {
-            float3 WorldPos = float3(0, 0, 6360.0f + CameraAerialPerspectiveVolumeParam.w);
-            // float3 WorldDir = normalize(IN.vertex.xzy);
-            float3 WorldDir = normalize(normalize((IN.posWorld.xzy - _WorldSpaceCameraPos.xzy) * 6420.0f - WorldPos));
-
-            float viewHeight = length(WorldPos);
-            float2 uv;
-            float3 UpVector = normalize(WorldPos);
-            float viewZenithCosAngle = dot(WorldDir, UpVector);
-
-            // float IntersectGround = raySphereIntersectNearest(WorldPos, WorldDir, float3(0, 0, 0), 6360.0f);
-            
-            SkyViewLutParamsToUv(WorldDir.z, viewZenithCosAngle, WorldDir, viewHeight, 6360, float2(96.0f, 104.0f), uv);
-
-            float4 col = tex2D(_SkyViewLutTextureL, uv);
-            col.rgb += GetSunSunLuminance(WorldDir, -g_AtmosphereLightDirection.xzw, WorldDir.z);
-            return col;
-        }
+        // half4 fragUE(v2f IN) : SV_Target
+        // {
+        //     float3 WorldPos = float3(0, 0, 6360.0f + CameraAerialPerspectiveVolumeParam.w);
+        //     // float3 WorldDir = normalize(IN.vertex.xzy);
+        //     float3 WorldDir = normalize(normalize((IN.posWorld.xzy - _WorldSpaceCameraPos.xzy) * 6420.0f - WorldPos));
+        //
+        //     float viewHeight = length(WorldPos);
+        //     float2 uv;
+        //     float3 UpVector = normalize(WorldPos);
+        //     float viewZenithCosAngle = dot(WorldDir, UpVector);
+        //
+        //     // float IntersectGround = raySphereIntersectNearest(WorldPos, WorldDir, float3(0, 0, 0), 6360.0f);
+        //     
+        //     SkyViewLutParamsToUv(WorldDir.z, viewZenithCosAngle, WorldDir, viewHeight, 6360, float2(96.0f, 104.0f), uv);
+        //
+        //     float4 col = tex2D(_SkyViewLutTextureL, uv);
+        //     col.rgb += GetSunSunLuminance(WorldDir, -g_AtmosphereLightDirection.xzw, WorldDir.z);
+        //     return col;
+        // }
         
         ENDCG
     }

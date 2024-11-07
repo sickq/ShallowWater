@@ -22,18 +22,18 @@
         [Range(10.0f, 150.0f)] public float AtmosphereHeight = 60.0f;
 
         [Header("Mie消散颜色")]
-        public Color MieExtinctionColor = new Color(0.35055f, 0.20272f, 0.21735f);
+        [ColorUsage(false, true)] public Color MieExtinctionColor = new Color(0.35055f, 0.20272f, 0.21735f);
         [Range(0.001f, 10.0f)] public float MieExtinctionLength = 1f;
         
         [Header("Mie散射颜色")]
-        public Color MieScatteringColor = new Color(0.20755f, 0.05972f, 0.07435f);
+        [ColorUsage(false, true)] public Color MieScatteringColor = new Color(0.20755f, 0.05972f, 0.07435f);
         [Range(0.001f, 10.0f)] public float MieScatteringLength = 1.0f;
         
         [Header("Rayleigh散射颜色")]
-        public Color RayleighScatteringColor = new Color(0.09204f, 0.1276f, 0.20117f);
+        [ColorUsage(false, true)] public Color RayleighScatteringColor = new Color(0.09204f, 0.1276f, 0.20117f);
         [Range(0.001f, 10.0f)] public float RayleighScatteringLength = 1.0f;
 
-        public Color AbsorptionExtinctionColor = new Color(0.00574f, 0.0074f, 0.00035f);
+        [ColorUsage(false, true)] public Color AbsorptionExtinctionColor = new Color(0.00574f, 0.0074f, 0.00035f);
         [Range(0.001f, 10.0f)] public float AbsorptionExtinctionLength = 1.0f;
 
         [Header("地表颜色")]

@@ -11,11 +11,13 @@ Shader "Unlit/DefaultLit"
 
         Pass
         {
+            ZWrite On
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
 
             #include "UnityCG.cginc"
+            #include "Atmosphere.hlsl"
 
             struct appdata
             {
@@ -35,30 +37,17 @@ Shader "Unlit/DefaultLit"
             sampler2D _MainTex;
             float4 _MainTex_ST;
             float4 _Color;
-
-            float4 g_AtmosphereLightDirection;
-            float4 g_CameraAerialPerspectiveVolumeParam;
-            UNITY_DECLARE_TEX3D(AtmosphereCameraScatteringVolume);
             
             v2f vert (appdata v)
             {
                 v2f o = (v2f)0;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 o.posWorld = mul(unity_ObjectToWorld, float4(v.vertex.xyz, 1.0));
-                // o.viewDir.xyz = o.posWorld - _WorldSpaceCameraPos.xyz;
-                // float3 normalizeViewDir = normalize(o.viewDir.xyz);
-                //
-                // float xz = sqrt(1 - normalizeViewDir.y * normalizeViewDir.y);
-                //
-                // o.customValue.x = sqrt(dot(o.viewDir.xz, o.viewDir.xz));
-                //
-                // float atmosTempValue = dot(float2(-normalizeViewDir.x, normalizeViewDir.z), g_AtmosphereLightDirection.xy);
-                // atmosTempValue = clamp(atmosTempValue / xz, -1, 1);
-                //
-                // atmosTempValue = acos(atmosTempValue);
-                // atmosTempValue = atmosTempValue / UNITY_PI;
-                // atmosTempValue = sqrt(atmosTempValue);
-                // o.viewDir.w = atmosTempValue;
+
+                o.viewDir.xyz = o.posWorld - _WorldSpaceCameraPos.xyz;
+                float2 atmosVertData = PrepareAtmosphereVertex(o.viewDir.xyz);
+                o.viewDir.w = atmosVertData.y;
+                o.customValue.x = atmosVertData.x;
                 
                 o.uv = TRANSFORM_TEX(v.uv, _MainTex);
                 return o;
@@ -69,39 +58,35 @@ Shader "Unlit/DefaultLit"
                 half4 col = tex2D(_MainTex, i.uv) * _Color;
 
                 float3 viewDir = i.posWorld - _WorldSpaceCameraPos.xyz;
-                float3 normalizeViewDir = normalize(viewDir);
 
-                float xz = sqrt(1 - normalizeViewDir.y * normalizeViewDir.y);
+                float4 atmosphereColor = CalculateAtmosphere(viewDir);
 
-                float tempValue = sqrt(dot(viewDir.xz, viewDir.xz));
-                
-                float atmosTempValue = dot(float2(-normalizeViewDir.x, normalizeViewDir.z), g_AtmosphereLightDirection.xy);
-                atmosTempValue = clamp(atmosTempValue / xz, -1, 1);
-
-                atmosTempValue = acos(atmosTempValue);
-                atmosTempValue = atmosTempValue / UNITY_PI;
-                atmosTempValue = sqrt(atmosTempValue);
-
-                float atmosUVTemp = saturate((viewDir.y + g_CameraAerialPerspectiveVolumeParam.x) * g_CameraAerialPerspectiveVolumeParam.z);
-                float atmosUVTemp1 = saturate(tempValue * g_CameraAerialPerspectiveVolumeParam.y);
-
-                float3 atmosUV = 0;
-                atmosUV.yz = sqrt(float2(atmosUVTemp, atmosUVTemp1));
-                atmosUV.x = atmosTempValue;
-                
-                // float atmosUVTemp = saturate((i.viewDir.y + g_CameraAerialPerspectiveVolumeParam.x) * g_CameraAerialPerspectiveVolumeParam.z);
-                // float atmosUVTemp1 = saturate(i.customValue.x * g_CameraAerialPerspectiveVolumeParam.y);
-                //
-                // float3 atmosUV = 0;
-                // atmosUV.yz = sqrt(float2(atmosUVTemp, atmosUVTemp1));
-                // atmosUV.x = i.viewDir.w;
-                
-                float4 atmosphereColor = UNITY_SAMPLE_TEX3D_LOD(AtmosphereCameraScatteringVolume, atmosUV, 0);
+                // float4 atmosphereColor = CalculateAtmosphereVertex(viewDir.y, i.viewDir.w, i.customValue.x);
 
                 col.rgb = lerp(col.rgb, atmosphereColor.rgb, atmosphereColor.a);
                 col.a = 1 - atmosphereColor.a;
                 return col;
             }
+            ENDCG
+        }
+        
+        Pass 
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            ZWrite On ZTest LEqual
+
+            CGPROGRAM
+            #pragma target 3.0
+
+            // -------------------------------------
+
+            #pragma vertex vertShadowCaster
+            #pragma fragment fragShadowCaster
+
+            #include "UnityStandardShadow.cginc"
+
             ENDCG
         }
     }
