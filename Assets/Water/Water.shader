@@ -26,7 +26,7 @@ Shader "Scene/Water"
         _WaterSmoothness("Water Smoothness", Range(0, 1)) = 1.0
         
         [Header(Normal)]
-        _WaterNormal("Water Normal", 2D) = "bump" {}
+        [NoScaleOffset] _WaterNormal("Water Normal", 2D) = "bump" {}
         _NormalScale("Normal Scale", Range(0, 2)) = 0.1
         _MicroWaveNormalScale("Micro Wave Normal Scale", Range(0, 2)) = 0.1
         _MacroWaveNormalScale("Macro Wave Normal Scale", Range(0, 2)) = 0.1
@@ -37,6 +37,7 @@ Shader "Scene/Water"
         _SlowWaterSpeed("Slow Water Speed", Vector) = (-0.4, 0.0, -0.02, 0.00)
         _SlowWaterTiling("Slow Water Tiling(XY)", Vector) = (10.0, 10.0, 1, 1)
         
+        [Header(Cascade Parma)]
         _BigCascadeAngle("Big Cascade Angle", Range(0, 360)) = 45
         _BigCascadeAngleFalloff("Big Cascade Angle Falloff", Range(0, 10)) = 1
         
@@ -44,7 +45,7 @@ Shader "Scene/Water"
         _SmallCascadeAngleFalloff("Small Cascade Angle Falloff", Range(0, 10)) = 1
         
         [Header(WaterFallEffect)]
-        _WaterFallEffect("Water Fall Effect", 2D) = "black" {}
+        [NoScaleOffset] _WaterFallEffect("Water Fall Effect", 2D) = "black" {}
         _WaterFallEffectTiling("Water Fall Effect Tiling", Vector) = (1, 1, 0, 0)
         _WaterFallEffectTiling2("Water Fall Effect Tiling2", Vector) = (1, 1, 0, 0)
         _WaterFallColor("Water Fall Color", Color) = (1, 1, 1, 1)
@@ -52,7 +53,7 @@ Shader "Scene/Water"
         _WaterFallEffectAlpha("Water Fall Effect Alpha", Range(0, 1)) = 1
         
         [Header(Foam)]
-        _WaterFoam("Water Foam", 2D) = "black" {}
+        [NoScaleOffset] _WaterFoam("Water Foam", 2D) = "black" {}
         _TilingSpeedFoam("Tiling Speed Foam", Vector) = (100, 100, 1, 1)
         _FoamIntensity("Foam Intensity", Range(0, 1)) = 1.0
         _ShadowDistort("Shadow Distort", Range(0, 1)) = 0.3
@@ -64,22 +65,15 @@ Shader "Scene/Water"
         
         
         [Header(Caustics)]
-		// Approximate rays being focused/defocused on underwater surfaces
-		[Toggle] _Caustics("Enable", Float) = 1
-		// Caustics texture
+		[Toggle] _Caustics("_Caustics Enable", Float) = 1
 		[NoScaleOffset] _CausticsTexture("Caustics", 2D) = "black" {}
-		// Caustics texture scale
-		_CausticsTextureScale("Caustics Scale", Range(0.0, 25.0)) = 5.0
-		// The 'mid' value of the caustics texture, around which the caustic texture values are scaled
-		_CausticsTextureAverage("Caustics Texture Grey Point", Range(0.0, 1.0)) = 0.07
-		// Scaling / intensity
-		_CausticsStrength("Caustics Strength", Range(0.0, 10.0)) = 3.2
-		// The depth at which the caustics are in focus
-		_CausticsFocalDepth("Caustics Focal Depth", Range(0.0, 250.0)) = 2.0
-		// The range of depths over which the caustics are in focus
-		_CausticsDepthOfField("Caustics Depth of Field", Range(0.01, 1000.0)) = 0.33
+		_CausticsTextureScale("_CausticsTextureScale", Range(0.0, 25.0)) = 8.06
+		_CausticsTextureAverage("_CausticsTextureAverage", Range(0.0, 1.0)) = 0.039
+		_CausticsStrength("Caustics Strength", Range(0.0, 10.0)) = 6.16
+		_CausticsFocalDepth("Caustics Focal Depth", Range(0.0, 250.0)) = 1.9
+		_CausticsDepthOfField("Caustics Depth of Field", Range(0.01, 1000.0)) = 4.98
 
-        _CausticsEdgeSmooth("Caustics Edge Smooth", Range(0, 20)) = 8.0
+        _CausticsEdgeSmooth("Caustics Edge Smooth", Range(0, 10)) = 8.0
     }
     
     CGINCLUDE
@@ -174,11 +168,13 @@ Shader "Scene/Water"
         float pixelEyeDepth = i.projPos.z;
         float baseEyeTexDepth = pixelEyeDepth;
         
+        
         float3 normalWithWave = finalNormal;
         
-        float3 underWaterColor = CalculateUnderWater(normalWithWave, pixelEyeDepth, i.projPos, mask);
 
         float depthDelta = CalculateDepthDelta(i.projPos, baseEyeTexDepth);
+        float3 cameraDepthPosWorld = CalculateScenePosition(baseEyeTexDepth, pixelEyeDepth, i.posWorld.xyz);
+        
         float shalowFalloff = CalculateShalowFalloff(depthDelta);
         float3 mainLightColor = MainLightColor();
 
@@ -187,6 +183,7 @@ Shader "Scene/Water"
 
         float depthFade = smoothstep(0, 1, saturate(depthDelta / gEdgeDepth));
         float underWaterLerp = saturate((1 - shalowFalloff) * depthFade);
+        float3 underWaterColor = CalculateUnderWater(normalWithWave, pixelEyeDepth, i.projPos, mask);
         waterBaseColor = lerp(underWaterColor, waterBaseColor, underWaterLerp);
 
         //TODO bakedWaterShadowMap 预烘焙的水阴影
@@ -196,8 +193,8 @@ Shader "Scene/Water"
 
         waterBaseColor = lerp(waterBaseColor, ambientColor * waterFallEffect.xyz, bigCascade);
 
-        ApplyCaustics(baseEyeTexDepth, V, i.posWorld.xyz, L, waterBaseColor);
-        return float4(waterBaseColor, 1);
+        if(_Caustics)
+        ApplyCaustics(baseEyeTexDepth, cameraDepthPosWorld, i.posWorld.xyz, L, waterBaseColor);
 
         float cleanFalloff = CalculateCleanFalloff(depthDelta, facing, mask);
         

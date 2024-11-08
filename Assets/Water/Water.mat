@@ -82,12 +82,12 @@ Material:
     - _BigCascadeAngleFalloff: 1
     - _BumpScale: 1
     - _Caustics: 0
-    - _CausticsDepthOfField: 39
-    - _CausticsEdgeSmooth: 1.54
-    - _CausticsFocalDepth: 2
-    - _CausticsStrength: 8.57
-    - _CausticsTextureAverage: 0
-    - _CausticsTextureScale: 5
+    - _CausticsDepthOfField: 4.98
+    - _CausticsEdgeSmooth: 9.8
+    - _CausticsFocalDepth: 1.9
+    - _CausticsStrength: 6
+    - _CausticsTextureAverage: 0.039
+    - _CausticsTextureScale: 13.2
     - _CleanFalloffMultiply: 1
     - _CleanFalloffPower: 1
     - _Cutoff: 0.5

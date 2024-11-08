@@ -1,6 +1,8 @@
 ﻿#ifndef WATER_LIBRARY
 #define WATER_LIBRARY
 
+#include "UnityCG.cginc"
+
 sampler2D _WaterNormal;
 sampler2D _WaterFoam;
 sampler2D _WaterFallEffect;
@@ -158,6 +160,16 @@ float CalculateDepthDelta(float4 projPos, out float baseEyeTexDepth)
     return depthDelta;
 }
 
+float3 CalculateScenePosition(float baseEyeTexDepth, float eyeDepth, float3 posWorld)
+{
+	float3 tempValue = posWorld.xyz - _WorldSpaceCameraPos.xyz;
+	tempValue = tempValue / eyeDepth;
+	float m_depth = baseEyeTexDepth;
+	tempValue *= m_depth;
+	tempValue += _WorldSpaceCameraPos.xyz;
+	return tempValue;
+}
+
 float CalculateShalowFalloff(float depthDelta)
 {
     float shalowFalloff = depthDelta * _ShalowFalloffMultiply;
@@ -227,6 +239,7 @@ float3 CalculateWaterFallPosWord(float4 waterFallEffect, float foamIntensity, fl
 }
 
 UNITY_DECLARE_TEX2D(_CausticsTexture);
+float _Caustics;
 float _CausticsFocalDepth;
 float _CausticsDepthOfField;
 float _CausticsTextureScale;
@@ -234,53 +247,47 @@ float _CausticsStrength;
 float _CausticsTextureAverage;
 float _CausticsEdgeSmooth;
 
-void ApplyCaustics(float eyeDepthTex, float3 viewDir, float3 posWorld, float3 lightDir, inout float3 waterColor)
+void ApplyCaustics(float eyeDepthTex, float3 scenePos, float3 posWorld, float3 lightDir, inout float3 waterColor)
 {
-	float3 camera2WorldLDir = viewDir * eyeDepthTex;
-	float zdist = mul(unity_MatrixInvV[2].xyz, -camera2WorldLDir);
-	float3 scenePos = camera2WorldLDir / zdist;
-	scenePos = _WorldSpaceCameraPos.xyz - scenePos;
-	float sceneDepth = posWorld.y - scenePos.y;
-
-	
-	// Compute mip index manually, with bias based on sea floor depth. We compute it manually because if it is computed automatically it produces ugly patches
-	// where samples are stretched/dilated. The bias is to give a focusing effect to caustics - they are sharpest at a particular depth. This doesn't work amazingly
-	// well and could be replaced.
-	float mipLod = log2(max(eyeDepthTex, 1.0)) + abs(sceneDepth - _CausticsFocalDepth) / _CausticsDepthOfField;
-
-	// waterColor = mipLod / 10;
-	// return;
-	
-	// project along light dir, but multiply by a fudge factor reduce the angle bit - compensates for fact that in real life
-	// caustics come from many directions and don't exhibit such a strong directonality
-	// Removing the fudge factor (4.0) will cause the caustics to move around more with the waves. But this will also
-	// result in stretched/dilated caustics in certain areas. This is especially noticeable on angled surfaces.
-	float2 lightProjection = lightDir.xz * sceneDepth / (4.0 * lightDir.y);
-	float _CrestTime = _Time.y;
-	
-	float3 cuv1 = 0.0; float3 cuv2 = 0.0;
+	if(_Caustics > 0.5)
 	{
-		float2 surfacePosXZ = scenePos.xz;
-		float surfacePosScale = 1.37;
+	    float sceneDepth = posWorld.y - scenePos.y;
+	
+	    // Compute mip index manually, with bias based on sea floor depth. We compute it manually because if it is computed automatically it produces ugly patches
+	    // where samples are stretched/dilated. The bias is to give a focusing effect to caustics - they are sharpest at a particular depth. This doesn't work amazingly
+	    // well and could be replaced.
+	    float mipLod = log2(eyeDepthTex) + abs(sceneDepth - _CausticsFocalDepth) / _CausticsDepthOfField;
 
-		surfacePosXZ += lightProjection;
+	    // project along light dir, but multiply by a fudge factor reduce the angle bit - compensates for fact that in real life
+	    // caustics come from many directions and don't exhibit such a strong directonality
+	    // Removing the fudge factor (4.0) will cause the caustics to move around more with the waves. But this will also
+	    // result in stretched/dilated caustics in certain areas. This is especially noticeable on angled surfaces.
+	    float2 lightProjection = lightDir.xz * sceneDepth / (4.0 * lightDir.y);
+	    float _CrestTime = _Time.y;
+	
+	
+	    float3 cuv1 = 0.0; float3 cuv2 = 0.0;
+	    {
+	        float2 surfacePosXZ = scenePos.xz;
+	        float surfacePosScale = 1.37;
 
-		cuv1 = float3(surfacePosXZ / _CausticsTextureScale + float2(0.044 * _CrestTime + 17.16, -0.169 * _CrestTime), mipLod);
-		cuv2 = float3(surfacePosScale * surfacePosXZ / _CausticsTextureScale + float2(0.248 * _CrestTime, 0.117 * _CrestTime), mipLod);
+	        surfacePosXZ += lightProjection;
+
+	        cuv1 = float3(surfacePosXZ / _CausticsTextureScale + float2(0.044 * _CrestTime + 17.16, -0.169 * _CrestTime), mipLod);
+	        cuv2 = float3(surfacePosScale * surfacePosXZ / _CausticsTextureScale + float2(0.248 * _CrestTime, 0.117 * _CrestTime), mipLod);
+	    }
+
+	    float3 causticsColor =  _CausticsStrength *
+        (
+            0.5 * UNITY_SAMPLE_TEX2D_LOD(_CausticsTexture, cuv1.xy, cuv1.z).xyz +
+            0.5 * UNITY_SAMPLE_TEX2D_LOD(_CausticsTexture, cuv2.xy, cuv2.z).xyz -
+            _CausticsTextureAverage
+        );
+
+
+	    half edgeSmooth = saturate((10.1000004 - _CausticsEdgeSmooth) * sceneDepth);
+	    waterColor *= causticsColor * edgeSmooth + 1.0;
 	}
-
-	float3 causticsColor =  _CausticsStrength *
-	(
-		0.5 * UNITY_SAMPLE_TEX2D_LOD(_CausticsTexture, cuv1.xy, cuv1.z).xyz +
-		0.5 * UNITY_SAMPLE_TEX2D_LOD(_CausticsTexture, cuv2.xy, cuv2.z).xyz -
-		_CausticsTextureAverage
-	);
-
-	waterColor = causticsColor;
-	return;
-
-	half edgeSmooth = saturate((10.1000004 - _CausticsEdgeSmooth) * sceneDepth);
-	waterColor *= causticsColor * edgeSmooth + 1.0;
 }
 
 #endif
