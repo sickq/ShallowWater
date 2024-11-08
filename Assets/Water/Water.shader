@@ -264,6 +264,25 @@ Shader "Unlit/Water"
         depthDelta = max(abs(depthDelta), _MinWaterDepth);
         return depthDelta;
     }
+
+    float CalculateShalowFalloff(float depthDelta)
+    {
+        float shalowFalloff = depthDelta * _ShalowFalloffMultiply;
+        shalowFalloff = pow(shalowFalloff, -_ShalowFalloffPower);
+        shalowFalloff = min(shalowFalloff, 1);
+        return shalowFalloff;
+    }
+
+    float CalculateCleanFalloff(float depthDelta, float facing, float mask)
+    {
+        float cleanFalloff = depthDelta * _CleanFalloffMultiply;
+        cleanFalloff = pow(cleanFalloff, _CleanFalloffPower);
+        cleanFalloff = min(cleanFalloff, 1);
+        float backFaceCleanFalloff = cleanFalloff * _BackfaceAlpha;
+        cleanFalloff = facing >= 0 ? cleanFalloff : backFaceCleanFalloff;
+        cleanFalloff = mask * cleanFalloff;
+        return cleanFalloff;
+    }
     
     half3 Max3(half3 xyz)
     {
@@ -300,6 +319,20 @@ Shader "Unlit/Water"
         return waterFallEffect;
     }
 
+    float3 CalculateWaterFallPosWord(float4 waterFallEffect, float foamIntensity, float bigCascade, float3 posWorld)
+    {
+        float3 waterFallPosWorld = 0;
+        waterFallPosWorld.x = dot(waterFallEffect.ww, waterFallEffect.xx);
+        waterFallPosWorld.y = waterFallEffect.y + waterFallEffect.y;
+        waterFallPosWorld.xy = float2(waterFallPosWorld.x, waterFallPosWorld.y) - 1;
+        waterFallPosWorld.xy = waterFallPosWorld.xy * float2(_ShadowDistort, _ShadowDistort);
+        float tempC = dot(waterFallPosWorld.xy, waterFallPosWorld.xy);
+        waterFallPosWorld.z = sqrt(1 - min(tempC, 1));
+        waterFallPosWorld = foamIntensity * _ShadowDistort + waterFallPosWorld;
+        waterFallPosWorld = bigCascade * waterFallPosWorld + posWorld.xyz;
+        return waterFallPosWorld;
+    }
+
     
     half4 frag(v2f i, float facing : VFACE) : SV_Target
     {
@@ -323,7 +356,6 @@ Shader "Unlit/Water"
 
         float iceIntensity = saturate(_IceIntensity);
 
-
         float3 slowWaveNormal = 0;
         float3 finalNormal = 0;
         CalculateNormal(uv, bigCascade, slowWaveNormal, finalNormal);
@@ -332,17 +364,9 @@ Shader "Unlit/Water"
 
         float4 waterFallEffect = CalculateWaterFallEffect(i.uv.xy);
 
-        float3 waterFallPosWorld = 0;
-        waterFallPosWorld.x = dot(waterFallEffect.ww, waterFallEffect.xx);
-        waterFallPosWorld.y = waterFallEffect.y + waterFallEffect.y;
-        waterFallPosWorld.xy = float2(waterFallPosWorld.x, waterFallPosWorld.y) - 1;
-        waterFallPosWorld.xy = waterFallPosWorld.xy * float2(_ShadowDistort, _ShadowDistort);
-        float tempC = dot(waterFallPosWorld.xy, waterFallPosWorld.xy);
-        waterFallPosWorld.z = sqrt(1 - min(tempC, 1));
-        waterFallPosWorld = foamIntensity * _ShadowDistort + waterFallPosWorld;
-        waterFallPosWorld = bigCascade * waterFallPosWorld + i.posWorld.xyz;
+        float3 waterFallPosWorld = CalculateWaterFallPosWord(waterFallEffect, foamIntensity, bigCascade, i.posWorld.xyz);
 
-        //TODO bakedWaterShadowMap
+        //TODO bakedWaterShadowMap 需要使用waterFallPosWorld
         float bakedWaterShadowMap = 1;
         
         //TODO DynamicWave 可以结合浅水方程来实现
@@ -355,15 +379,10 @@ Shader "Unlit/Water"
         float3 underWaterColor = CalculateUnderWater(normalWithWave, pixelEyeDepth, i.projPos, mask);
 
         float depthDelta = CalculateDepthDelta(i.projPos);
-
-        float shalowFalloff = depthDelta * _ShalowFalloffMultiply;
-        shalowFalloff = pow(shalowFalloff, -_ShalowFalloffPower);
-        shalowFalloff = min(shalowFalloff, 1);
-
-        float3 waterBaseColor = lerp(_DeepColor.rgb, _ShalowColor.rgb, shalowFalloff);
-
+        float shalowFalloff = CalculateShalowFalloff(depthDelta);
         float3 mainLightColor = MainLightColor();
 
+        float3 waterBaseColor = lerp(_DeepColor.rgb, _ShalowColor.rgb, shalowFalloff);
         waterBaseColor = lerp(waterBaseColor, waterBaseColor * mainLightColor, _EnvIntensity);
 
         float depthFade = smoothstep(0, 1, saturate(depthDelta / gEdgeDepth));
@@ -376,14 +395,8 @@ Shader "Unlit/Water"
         ambientColor = saturate(ambientColor);
 
         waterBaseColor = lerp(waterBaseColor, ambientColor * waterFallEffect.xyz, bigCascade);
-        
-        float cleanFalloff = depthDelta * _CleanFalloffMultiply;
-        cleanFalloff = pow(cleanFalloff, _CleanFalloffPower);
-        cleanFalloff = min(cleanFalloff, 1);
-        float backFaceCleanFalloff = cleanFalloff * _BackfaceAlpha;
-        cleanFalloff = facing >= 0 ? cleanFalloff : backFaceCleanFalloff;
 
-        float maxFalloff = mask * cleanFalloff;
+        float cleanFalloff = CalculateCleanFalloff(depthDelta, facing, mask);
         
         float3 waterSpecularCloseColor = lerp(_WaterSpecularClose, _EnvColor.rgb * _WaterSpecularClose * _AmbientColor.rgb, _EnvIntensity);
         
@@ -403,7 +416,7 @@ Shader "Unlit/Water"
             reflectDir.y = max(reflectDir.y, 0.0);
             float3 norm_reflectDir = normalize(reflectDir);
 
-            float NoV = dot(V, finalNormalWorld);
+            float NoV = dot(V, tempNormalWorld);
             float3 ssrUVZ = GetSSRUVZ(i.pos, i.posWorld, norm_reflectDir, NoV);
             // reflectColor = tex2D(_CameraOpaqueTexture, ssrUVZ.xy);
             reflectColor = tex2D(_CameraGrabTexture, ssrUVZ.xy);
@@ -421,12 +434,13 @@ Shader "Unlit/Water"
             reflectColor = lerp(skyCol.rgb, reflectColor, ssrWeight);
         }
 
-        float3 waterBaseColor2 = lerp(reflectColor, waterBaseColor * 0.5, bigCascade);
+        reflectColor = lerp(reflectColor, waterBaseColor * 0.5, bigCascade);
 
         float3 bakedColorTemp = (bakedWaterShadowMap * waterBaseColor) * (1 - waterSpecularCloseColor);
 
+
         half3 indirectDiffuse = SHEvalLinearL0L1(float4(finalNormalWorld,1 ));
-        
+
         BRDFData brdfData = (BRDFData)0;
         half alpha = 0;
         InitializeBRDFData_Specular(half3(0, 0, 0), half3(0, 0, 0), _WaterSmoothness, alpha, brdfData);
@@ -444,7 +458,7 @@ Shader "Unlit/Water"
         
         float offsetNoV = saturate(dot(tempNormalWorld, V));
         float fresnelParam = pow(1 - offsetNoV, 4);
-        resultColor = lerp(resultColor, waterBaseColor2, fresnelParam);
+        resultColor = lerp(resultColor, reflectColor, fresnelParam);
 
         resultColor = underWaterColor * bigCascade + resultColor;
         
@@ -455,26 +469,20 @@ Shader "Unlit/Water"
         float3 waterFallColor1 = waterBaseColor * _WaterFallColor.xyz;
         float3 waterFallColor2 = bigCascade * waterFallColor1;
 
-        resultColor = waterFallColor2 * maxFalloff + resultColor;
+        resultColor = waterFallColor2 * cleanFalloff + resultColor;
 
-        waterFallColor1 = lerp(maxFalloff * waterFallColor1, resultColor, bakedWaterShadowMap);
+        waterFallColor1 = lerp(cleanFalloff * waterFallColor1, resultColor, bakedWaterShadowMap);
         resultColor = lerp(resultColor, waterFallColor1, bigCascade);
 
         float waterFallEffectAlpha = bigCascade * _WaterFallEffectAlpha;
-        //
-        // float wterfalleffectAlphatest = - mask * cleanFalloff + waterFallEffect.x;
-        // waterFallEffectAlpha = waterFallEffectAlpha * wterfalleffectAlphatest + maxFalloff;
-        waterFallEffectAlpha = lerp(maxFalloff, waterFallEffect.w, waterFallEffectAlpha);
-
-        waterFallEffectAlpha = waterFallEffectAlpha * maxFalloff;
-
+        waterFallEffectAlpha = lerp(cleanFalloff, waterFallEffect.w, waterFallEffectAlpha);
+        waterFallEffectAlpha = waterFallEffectAlpha * cleanFalloff;
         waterFallEffectAlpha = lerp(waterFallEffectAlpha, waterFallEffectAlpha * _WaterFallAlpha, bigCascade);
-
         waterFallEffectAlpha = waterFallEffectAlpha * i.vertexColor.a * gFinalAlpha;
 
         float4 atmosphereColor = CalculateAtmosphere(i.posWorld.xyz - _WorldSpaceCameraPos.xyz);
 
-        resultColor.rgb = lerp(resultColor.rgb, atmosphereColor, atmosphereColor.a);
+        resultColor.rgb = lerp(resultColor.rgb, atmosphereColor.rgb, atmosphereColor.a);
         
         return float4(resultColor, waterFallEffectAlpha);
     }
