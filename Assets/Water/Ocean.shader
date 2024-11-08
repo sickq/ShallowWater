@@ -1,4 +1,4 @@
-Shader "Scene/Water"
+Shader "Scene/Ocean"
 {
     Properties
     {
@@ -17,11 +17,6 @@ Shader "Scene/Water"
         _MinWaterDepth("Min Water Depth", Range(0, 50)) = 0.0
         gEdgeDepth("Edge Depth", Range(0, 50)) = 30.0
         
-        [Header(Near Clean FallOff)] 
-        _CleanFalloffMultiply("Clean Falloff Multiply", Range(0, 5)) = 2.91
-        _CleanFalloffPower("Clean Falloff Power", Range(0, 5)) = 3.29
-        _BackfaceAlpha("Backface Alpha", Range(0, 1)) = 0.85
-        
         _WaterSpecularClose("Water Specular Close", Range(0, 1)) = 0.287
         _WaterSmoothness("Water Smoothness", Range(0, 1)) = 1.0
         
@@ -31,55 +26,14 @@ Shader "Scene/Water"
         _MicroWaveNormalScale("Micro Wave Normal Scale", Range(0, 2)) = 0.1
         _MacroWaveNormalScale("Macro Wave Normal Scale", Range(0, 2)) = 0.1
         _MicroWaveTiling("Micro Wave Tiling", Vector) = (3, 3, 1, 1)
-        [Toggle] _WorldTiling("World Tiling", Range(0, 1)) = 1
-        _GlobalTiling("Global Tiling", Range(0.001, 5)) = 3
 
         _SlowWaterSpeed("Slow Water Speed", Vector) = (-0.4, 0.0, -0.02, 0.00)
         _SlowWaterTiling("Slow Water Tiling(XY)", Vector) = (10.0, 10.0, 1, 1)
-        
-        _BigCascadeAngle("Big Cascade Angle", Range(0, 360)) = 45
-        _BigCascadeAngleFalloff("Big Cascade Angle Falloff", Range(0, 10)) = 1
-        
-        _SmallCascadeAngle("Small Cascade Angle", Range(0, 360)) = 1
-        _SmallCascadeAngleFalloff("Small Cascade Angle Falloff", Range(0, 10)) = 1
-        
-        [Header(WaterFallEffect)]
-        _WaterFallEffect("Water Fall Effect", 2D) = "black" {}
-        _WaterFallEffectTiling("Water Fall Effect Tiling", Vector) = (1, 1, 0, 0)
-        _WaterFallEffectTiling2("Water Fall Effect Tiling2", Vector) = (1, 1, 0, 0)
-        _WaterFallColor("Water Fall Color", Color) = (1, 1, 1, 1)
-        _WaterFallAlpha("Water Fall Alpha", Range(0, 1)) = 1
-        _WaterFallEffectAlpha("Water Fall Effect Alpha", Range(0, 1)) = 1
-        
-        [Header(Foam)]
-        _WaterFoam("Water Foam", 2D) = "black" {}
-        _TilingSpeedFoam("Tiling Speed Foam", Vector) = (100, 100, 1, 1)
-        _FoamIntensity("Foam Intensity", Range(0, 1)) = 1.0
-        _ShadowDistort("Shadow Distort", Range(0, 1)) = 0.3
         
         [Header(Environment)]
         _EnvIntensity("Env Intensity", Range(0, 1)) = 1.0
         _AmbientColor("Ambient Color", Color) = (0.53894, 0.64524, 0.64887, 1.00)
         _EnvColor("Env Color", Color) = (0.12794, 0.15877, 0.23585, 0.00)
-        
-        
-        [Header(Caustics)]
-		// Approximate rays being focused/defocused on underwater surfaces
-		[Toggle] _Caustics("Enable", Float) = 1
-		// Caustics texture
-		[NoScaleOffset] _CausticsTexture("Caustics", 2D) = "black" {}
-		// Caustics texture scale
-		_CausticsTextureScale("Caustics Scale", Range(0.0, 25.0)) = 5.0
-		// The 'mid' value of the caustics texture, around which the caustic texture values are scaled
-		_CausticsTextureAverage("Caustics Texture Grey Point", Range(0.0, 1.0)) = 0.07
-		// Scaling / intensity
-		_CausticsStrength("Caustics Strength", Range(0.0, 10.0)) = 3.2
-		// The depth at which the caustics are in focus
-		_CausticsFocalDepth("Caustics Focal Depth", Range(0.0, 250.0)) = 2.0
-		// The range of depths over which the caustics are in focus
-		_CausticsDepthOfField("Caustics Depth of Field", Range(0.01, 1000.0)) = 0.33
-
-        _CausticsEdgeSmooth("Caustics Edge Smooth", Range(0, 20)) = 8.0
     }
     
     CGINCLUDE
@@ -112,7 +66,6 @@ Shader "Scene/Water"
         float4 vertexColor : TEXCOORD7;
     };
 
-    
 
     v2f vert(appdata v)
     {
@@ -131,8 +84,6 @@ Shader "Scene/Water"
         return o;
     }
 
-
-    
     half4 frag(v2f i, float facing : VFACE) : SV_Target
     {
         float3 V = normalize(UnityWorldSpaceViewDir(i.posWorld));
@@ -142,10 +93,6 @@ Shader "Scene/Water"
         float3 tangent = i.worldTangent.xyz;
         float3 biTangent = i.worldBiTangent.xyz;
 
-        float normalY = saturate(normal.y);
-
-        float bigCascade = calculateCascadeValue(normalY, _BigCascadeAngle, _BigCascadeAngleFalloff);
-        float smallCascade = calculateCascadeValue(normalY, _SmallCascadeAngle, _SmallCascadeAngleFalloff);
 
         bool branch = 0.5 < _WorldTiling;
         float2 uv = branch ? i.posWorld.xz : i.uv.xy;
@@ -157,16 +104,7 @@ Shader "Scene/Water"
 
         float3 slowWaveNormal = 0;
         float3 finalNormal = 0;
-        CalculateNormal(uv, bigCascade, slowWaveNormal, finalNormal);
-        
-        float foamIntensity = CalculateFoamIntensity(i.uv.xy, smallCascade, slowWaveNormal);
-
-        float4 waterFallEffect = CalculateWaterFallEffect(i.uv.xy);
-
-        float3 waterFallPosWorld = CalculateWaterFallPosWord(waterFallEffect, foamIntensity, bigCascade, i.posWorld.xyz);
-
-        //TODO bakedWaterShadowMap 需要使用waterFallPosWorld
-        float bakedWaterShadowMap = 1;
+        CalculateNormal(uv, 0, slowWaveNormal, finalNormal);
         
         //TODO DynamicWave 可以结合浅水方程来实现
 
@@ -189,22 +127,14 @@ Shader "Scene/Water"
         float underWaterLerp = saturate((1 - shalowFalloff) * depthFade);
         waterBaseColor = lerp(underWaterColor, waterBaseColor, underWaterLerp);
 
-        //TODO bakedWaterShadowMap 预烘焙的水阴影
-        float3 ambientColor = lerp(_AmbientColor.rgb, mainLightColor, bakedWaterShadowMap);
+        float3 ambientColor = lerp(_AmbientColor.rgb, mainLightColor, 1);
         ambientColor = lerp(float3(1, 1, 1), ambientColor, _EnvIntensity);
         ambientColor = saturate(ambientColor);
 
-        waterBaseColor = lerp(waterBaseColor, ambientColor * waterFallEffect.xyz, bigCascade);
-
-        ApplyCaustics(baseEyeTexDepth, V, i.posWorld.xyz, L, waterBaseColor);
-        return float4(waterBaseColor, 1);
-
-        float cleanFalloff = CalculateCleanFalloff(depthDelta, facing, mask);
-        
         float3 waterSpecularCloseColor = lerp(_WaterSpecularClose, _EnvColor.rgb * _WaterSpecularClose * _AmbientColor.rgb, _EnvIntensity);
         
         float3 normalWorld = normalize(tangent * slowWaveNormal.x + biTangent * slowWaveNormal.y + normal * slowWaveNormal.z);
-        float3 tempNormalWorld = bigCascade * float3(0, -1, 1) + float3(0, 1, 0);
+        float3 tempNormalWorld = float3(0, 1, 0);
 
         float viewYParam = 1 - min(abs(V.y + V.y), 1);
         tempNormalWorld = lerp(normalWorld, tempNormalWorld, viewYParam);
@@ -212,7 +142,7 @@ Shader "Scene/Water"
         float3 finalNormalWorld = normalize(tangent * normalWithWave.x + biTangent * normalWithWave.y + normal * normalWithWave.z);
 
         float3 reflectColor = 0;
-        if(bigCascade < 1.0)
+        if(0 < 1.0)
         {
             float3 reflectDir = reflect(-V, tempNormalWorld);
 
@@ -237,10 +167,7 @@ Shader "Scene/Water"
             reflectColor = lerp(skyCol.rgb, reflectColor, ssrWeight);
         }
 
-        reflectColor = lerp(reflectColor, waterBaseColor * 0.5, bigCascade);
-
-        float3 bakedColorTemp = (bakedWaterShadowMap * waterBaseColor) * (1 - waterSpecularCloseColor);
-
+        float3 bakedColorTemp = waterBaseColor * (1 - waterSpecularCloseColor);
 
         half3 indirectDiffuse = SHEvalLinearL0L1(float4(finalNormalWorld,1 ));
 
@@ -255,39 +182,19 @@ Shader "Scene/Water"
         
         half3 specular = (brdf * waterSpecularCloseColor + bakedColorTemp) * radiance;
 
-        specular = (1 - bigCascade) * specular;
-
         half3 resultColor = indirectDiffuse * bakedColorTemp + specular;
         
         float offsetNoV = saturate(dot(tempNormalWorld, V));
         float fresnelParam = pow(1 - offsetNoV, 4);
         resultColor = lerp(resultColor, reflectColor, fresnelParam);
 
-        resultColor = underWaterColor * bigCascade + resultColor;
-        
-        foamIntensity = foamIntensity * (1 - bigCascade) * (1 - iceIntensity);
-
-        resultColor = lerp(resultColor, foamIntensity * mainLightColor, foamIntensity);
-
-        float3 waterFallColor1 = waterBaseColor * _WaterFallColor.xyz;
-        float3 waterFallColor2 = bigCascade * waterFallColor1;
-
-        resultColor = waterFallColor2 * cleanFalloff + resultColor;
-
-        waterFallColor1 = lerp(cleanFalloff * waterFallColor1, resultColor, bakedWaterShadowMap);
-        resultColor = lerp(resultColor, waterFallColor1, bigCascade);
-
-        float waterFallEffectAlpha = bigCascade * _WaterFallEffectAlpha;
-        waterFallEffectAlpha = lerp(cleanFalloff, waterFallEffect.w, waterFallEffectAlpha);
-        waterFallEffectAlpha = waterFallEffectAlpha * cleanFalloff;
-        waterFallEffectAlpha = lerp(waterFallEffectAlpha, waterFallEffectAlpha * _WaterFallAlpha, bigCascade);
-        waterFallEffectAlpha = waterFallEffectAlpha * i.vertexColor.a * gFinalAlpha;
+        float resultAlpha = i.vertexColor.a * gFinalAlpha;
 
         float4 atmosphereColor = CalculateAtmosphere(i.posWorld.xyz - _WorldSpaceCameraPos.xyz);
 
         resultColor.rgb = lerp(resultColor.rgb, atmosphereColor.rgb, atmosphereColor.a);
         
-        return float4(resultColor, waterFallEffectAlpha);
+        return float4(resultColor, resultAlpha);
     }
 
     ENDCG

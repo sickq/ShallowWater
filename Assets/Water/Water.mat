@@ -27,6 +27,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _CausticsTexture:
+        m_Texture: {fileID: 2800000, guid: 1712f23cb5185144fa2614d2da21b39e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -77,6 +81,13 @@ Material:
     - _BigCascadeAngle: 0.1
     - _BigCascadeAngleFalloff: 1
     - _BumpScale: 1
+    - _Caustics: 0
+    - _CausticsDepthOfField: 39
+    - _CausticsEdgeSmooth: 1.54
+    - _CausticsFocalDepth: 2
+    - _CausticsStrength: 8.57
+    - _CausticsTextureAverage: 0
+    - _CausticsTextureScale: 5
     - _CleanFalloffMultiply: 1
     - _CleanFalloffPower: 1
     - _Cutoff: 0.5
@@ -109,13 +120,13 @@ Material:
     - _WaterFallAlpha: 1
     - _WaterFallEffectAlpha: 1
     - _WaterSmoothness: 0.659
-    - _WaterSpecularClose: 0.728
+    - _WaterSpecularClose: 0.899
     - _WorldTiling: 0
     - _ZWrite: 1
     - gEdgeDepth: 30
     - gFinalAlpha: 1
     m_Colors:
-    - _AmbientColor: {r: 0.5768672, g: 0.90188676, b: 0.90188676, a: 1}
+    - _AmbientColor: {r: 0.735849, g: 0.735849, b: 0.735849, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DeepColor: {r: 0.182435, g: 0.19878712, b: 0.2754717, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
